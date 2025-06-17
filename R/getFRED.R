@@ -27,7 +27,7 @@ getFRED <- function(series_id, api_key) {
   if (missing(api_key) || is.null(api_key) || api_key == "") {
     api_key <- Sys.getenv("FRED_API_KEY")
     if (identical(api_key, "") || is.null(api_key)) {
-      stop("API key not provided. Supply it as `api_key` argument or set the `FRED_API_KEY` environment variable.")
+      stop("API key not provided. Supply it as `api_key` argument or set the `FRED_API_KEY` environment variable. API key can be obtained from https://fred.stlouisfed.org/docs/api/api_key.html")
     }
   }
   
