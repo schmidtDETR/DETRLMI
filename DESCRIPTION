@@ -1,0 +1,16 @@
+Package: DETRLMI
+Type: Package
+Title: Useful tools by DETR LMI
+Version: 0.1.0
+Authors@R: c(
+    person("David", "Schmidt", email = "deschmidt@detr.nv.gov", role = c("aut", "cre")),
+    person("Antonio", "Solorio", email = "your.email@domain.com", role = "aut"))
+Description: Collection of useful functions compiled by DETR LMI
+License: LMI
+Encoding: UTF-8
+LazyData: true
+Imports:
+    httr (>= 1.4.7),
+    jsonlite (>= 1.8.8),
+    tibble (>= 3.2.1)
+RoxygenNote: 7.3.2
