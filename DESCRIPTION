@@ -4,13 +4,19 @@ Title: Useful tools by DETR LMI
 Version: 0.1.0
 Authors@R: c(
     person("David", "Schmidt", email = "deschmidt@detr.nv.gov", role = c("aut", "cre")),
-    person("Antonio", "Solorio", email = "your.email@domain.com", role = "aut"))
+    person("Antonio", "Solorio", email = "aisolorio@detr.nv.gov", role = "aut"))
 Description: Collection of useful functions compiled by DETR LMI
 License: LMI
 Encoding: UTF-8
 LazyData: true
 Imports:
+    data.table (>= 1.16),
+    dplyr (>= 1.1),
     httr (>= 1.4.7),
     jsonlite (>= 1.8.8),
+    lubridate (>= 1.9),
     tibble (>= 3.2.1)
 RoxygenNote: 7.3.2
+Suggests: 
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
