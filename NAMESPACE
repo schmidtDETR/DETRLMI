@@ -2,6 +2,10 @@
 
 export(getFRED)
 export(make_recession_table)
+export(run_query)
+importFrom(RODBC,odbcClose)
+importFrom(RODBC,odbcConnect)
+importFrom(RODBC,sqlQuery)
 importFrom(data.table,data.table)
 importFrom(data.table,rleid)
 importFrom(dplyr,filter)

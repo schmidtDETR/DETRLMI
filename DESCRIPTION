@@ -15,7 +15,8 @@ Imports:
     httr (>= 1.4.7),
     jsonlite (>= 1.8.8),
     lubridate (>= 1.9),
-    tibble (>= 3.2.1)
+    tibble (>= 3.2.1),
+    RODBC
 RoxygenNote: 7.3.2
 Suggests: 
     testthat (>= 3.0.0)
