@@ -18,7 +18,8 @@ Imports:
     tibble (>= 3.2.1),
     ggplot2 (>= 3.5),
     alfred (>= 0.2.1),
-    RODBC
+    RODBC,
+    rappdirs
 RoxygenNote: 7.3.2
 Suggests: 
     testthat (>= 3.0.0)
