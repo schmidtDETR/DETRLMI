@@ -1,7 +1,7 @@
 Package: DETRLMI
 Type: Package
 Title: Useful tools by DETR LMI
-Version: 0.2
+Version: 0.3
 Authors@R: c(
     person("David", "Schmidt", email = "deschmidt@detr.nv.gov", role = c("aut", "cre")),
     person("Antonio", "Solorio", email = "aisolorio@detr.nv.gov", role = "aut"))
