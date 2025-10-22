@@ -2,7 +2,7 @@
 % Please edit documentation in R/get_latest_qcew_data.R
 \name{get_latest_qcew_data}
 \alias{get_latest_qcew_data}
-\title{Get the Most Recent BLS QCEW Industry Data (with caching and validation)}
+\title{Get the Most Recent BLS QCEW Industry Data (with caching and BLS headers)}
 \usage{
 get_latest_qcew_data(industry_code = "10", quarters_to_check = c(2, 3))
 }
