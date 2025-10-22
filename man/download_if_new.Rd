@@ -4,25 +4,15 @@
 \alias{download_if_new}
 \title{Conditionally Download a File Based on Remote Metadata}
 \usage{
-download_if_new(
-  url,
-  cache_dir = NULL,
-  check = c("size", "modified"),
-  source = NULL
-)
+download_if_new(url, destfile, check = c("size", "modified"))
 }
 \arguments{
 \item{url}{A character string giving the full URL of the file to download.}
 
-\item{cache_dir}{Optional character string specifying a custom cache directory.
-Defaults to an OS-appropriate location via [get_cache_dir()].}
+\item{destfile}{Character string specifying the exact local file path to save the file.}
 
 \item{check}{A character string indicating the comparison method to determine
 whether a download is needed: `"size"` or `"modified"`.}
-
-\item{source}{Optional character string specifying a subfolder for the data
-source (e.g., `"doleta"`). Files will be stored under this subfolder in
-the cache directory.}
 }
 \value{
 The local file path (invisibly). The file will be downloaded if a
@@ -30,32 +20,7 @@ The local file path (invisibly). The file will be downloaded if a
 }
 \description{
 Checks whether a remote file has changed since the last download by comparing
-its size or last-modified timestamp. Caches files in a user-specific cache
-directory following OS conventions, optionally organized by source.
-}
-\details{
-The function performs an HTTP `HEAD` request using [httr::HEAD()] to retrieve
-the file’s metadata without downloading its content.
-- When `check = "size"`, it compares the `Content-Length` header with
-  [file.size()].
-- When `check = "modified"`, it compares the server's `Last-Modified` header
-  (if available) against a locally stored timestamp file with the same name
-  plus the extension `.meta`.
-
-Files are cached in a platform-appropriate location determined by
-[get_cache_dir()] and optionally organized by `source`.
-}
-\examples{
-\dontrun{
-# Default usage with source folder "doleta"
-path <- download_if_new(
-  url = "https://oui.doleta.gov/unemploy/csv/ar539.csv",
-  check = "size",
-  source = "doleta"
-)
-
-# Inspect cache folder
-get_cache_dir("doleta")
-}
-
+its size or last-modified timestamp. Caches files in the main package cache
+directory (no subfolders). Automatically removes any existing directory at
+the target file path.
 }

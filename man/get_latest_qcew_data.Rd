@@ -2,21 +2,24 @@
 % Please edit documentation in R/get_latest_qcew_data.R
 \name{get_latest_qcew_data}
 \alias{get_latest_qcew_data}
-\title{Get the Most Recent BLS QCEW Industry Data}
+\title{Get the Most Recent BLS QCEW Industry Data (with caching and validation)}
 \usage{
-get_latest_qcew_data()
+get_latest_qcew_data(industry_code = "10", quarters_to_check = c(2, 3))
+}
+\arguments{
+\item{industry_code}{Character string of the industry code (default `"10"` = Total all ownerships).}
+
+\item{quarters_to_check}{Numeric vector of quarters to look back (default `c(2,3)`).}
 }
 \value{
 A list containing:
 \describe{
-  \item{data}{A `data.table` containing the BLS data for the latest available quarter.}
+  \item{data}{A `data.table` containing the QCEW data for the most recent available quarter.}
   \item{check_quarter}{The quarter of the data returned.}
   \item{check_year}{The year of the data returned.}
 }
 }
 \description{
-This function checks recent quarters (by default, two previous quarters)
-of BLS Quarterly Census of Employment and Wages (QCEW) data for industry code 10,
-and downloads the most recent available CSV file. The function uses
-[download_if_new()] to cache data locally and avoid unnecessary re-downloads.
+Retrieves the most recent available **Quarterly Census of Employment and Wages (QCEW)** CSV file.
+Looks back two to three quarters (BLS data typically lags) and downloads the first available file.
 }

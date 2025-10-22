@@ -4,23 +4,12 @@
 \alias{get_cache_dir}
 \title{Get the User Cache Directory for the Package}
 \usage{
-get_cache_dir(source = NULL)
-}
-\arguments{
-\item{source}{Optional character string specifying a subfolder name (e.g., `"doleta"`).}
+get_cache_dir()
 }
 \value{
 A character string giving the full path to the cache directory.
 }
 \description{
 Returns the path to the user-specific cache directory used by the package.
-Optionally, a `source` subfolder can be specified.
-}
-\examples{
-# Default cache location
-get_cache_dir()
-
-# Cache location for a source folder
-get_cache_dir("doleta")
-
+No subfolders are created; all files go directly in this directory.
 }
