@@ -2,14 +2,12 @@
 % Please edit documentation in R/download_if_new.R
 \name{download_if_new}
 \alias{download_if_new}
-\title{Conditionally Download a File Based on Remote Metadata}
+\title{Conditionally Download a File Based on Remote Metadata (BLS-aware, direct download)}
 \usage{
-download_if_new(url, destfile, check = c("size", "modified"))
+download_if_new(url, check = c("size", "modified"))
 }
 \arguments{
 \item{url}{A character string giving the full URL of the file to download.}
-
-\item{destfile}{Character string specifying the exact local file path to save the file.}
 
 \item{check}{A character string indicating the comparison method to determine
 whether a download is needed: `"size"` or `"modified"`.}
@@ -20,7 +18,7 @@ The local file path (invisibly). The file will be downloaded if a
 }
 \description{
 Checks whether a remote file has changed since the last download by comparing
-its size or last-modified timestamp. Caches files in the main package cache
-directory (no subfolders). Automatically removes any existing directory at
-the target file path.
+its size or last-modified timestamp. Automatically determines a cache file
+name from the URL and stores it in the package cache directory.
+Adds special HTTP headers for BLS URLs and downloads files via `httr::GET`.
 }
