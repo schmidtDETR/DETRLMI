@@ -11,6 +11,7 @@
 #'
 #' @return The local file path (invisibly). The file will be downloaded if a
 #'   newer version is found or no cached version exists.
+#'
 #' @export
 download_if_new <- function(url, check = c("size", "modified")) {
   check <- match.arg(check)
@@ -115,6 +116,7 @@ download_if_new <- function(url, check = c("size", "modified")) {
 #' No subfolders are created; all files go directly in this directory.
 #'
 #' @return A character string giving the full path to the cache directory.
+#'
 #' @export
 get_cache_dir <- function() {
   dir <- rappdirs::user_cache_dir("DETRLMI")
