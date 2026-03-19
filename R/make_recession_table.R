@@ -56,7 +56,7 @@ make_recession_table <- function(api_key){
     filter(counter==1) |>
     select(date,trend)
 
-  current_trend <- if_else(df.recession[nrow(df.recession),2] == "recession", "no recession", "recession")
+  current_trend <- if_else(df.recession[[nrow(df.recession),2]] == "recession", "no recession", "recession")
   add_current <- data.frame(cur_date, current_trend)
   names(add_current) <- c("date", "trend")
 
