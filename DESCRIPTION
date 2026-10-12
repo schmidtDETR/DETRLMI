@@ -1,14 +1,13 @@
 Package: DETRLMI
 Type: Package
 Title: Useful tools by DETR LMI
-Version: 0.4
+Version: 0.6
 Authors@R: c(
     person("David", "Schmidt", email = "deschmidt@detr.nv.gov", role = c("aut", "cre")),
     person("Antonio", "Solorio", email = "aisolorio@detr.nv.gov", role = "aut"))
 Description: Collection of useful functions compiled by DETR LMI
 License: LMI
 Encoding: UTF-8
-LazyData: true
 Imports:
     data.table (>= 1.16),
     dplyr (>= 1.1),
@@ -18,14 +17,19 @@ Imports:
     tibble (>= 3.2.1),
     ggplot2 (>= 3.5),
     alfred (>= 0.2.1),
+    BLSloadR,
     RODBC,
     rappdirs,
     shiny,
     tidycensus,
-    DT,
-    collapsibleTree,
     stringr,
-    purrr
+    purrr,
+    mapgl,
+    tigris,
+    sf,
+    stats,
+    rlang,
+    htmlwidgets
 RoxygenNote: 7.3.3
 Suggests: 
     testthat (>= 3.0.0)

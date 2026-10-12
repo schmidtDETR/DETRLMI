@@ -51,5 +51,5 @@ get_latest_qcew_data <- function(industry_code = "10", quarters_to_check = c(2, 
     }
   }
 
-  stop("No recent QCEW data found — the BLS may not have released recent quarters yet.")
+  stop("No recent QCEW data found. The BLS may not have released recent quarters yet.")
 }

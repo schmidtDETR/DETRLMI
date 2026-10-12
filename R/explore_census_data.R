@@ -22,3 +22,28 @@ explore_census_data <- function() {
   # Launch the app
   shiny::runApp(app_dir, display.mode = "normal")
 }
+
+#' Launch the Census LEHD RAC File Explorer
+#'
+#' This function launches an interactive Shiny application to explore,
+#' filter, and download data from the LEHD Residence Area Characteristics (RAC) file.
+#'
+#' @import shiny
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' DETRLMI::explore_rac()
+#' }
+explore_rac <- function() {
+  # Locate the app inside the installed package
+  app_dir <- system.file("shiny", "rac_explorer", package = "DETRLMI")
+
+  # Error handling just in case the folder goes missing
+  if (app_dir == "") {
+    stop("Could not find the 'rac_explorer' app directory. Try re-installing the `DETRLMI` package.", call. = FALSE)
+  }
+
+  # Launch the app
+  shiny::runApp(app_dir, display.mode = "normal")
+}

@@ -64,7 +64,7 @@ download_if_new <- function(url, check = c("size", "modified")) {
 
   # If HEAD fails, proceed to download anyway
   if (is.null(resp)) {
-    message("HEAD request failed — downloading by default: ", filename)
+    message("HEAD request failed - downloading by default: ", filename)
   } else {
     # Check method: size
     if (check == "size") {
