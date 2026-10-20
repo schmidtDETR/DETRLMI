@@ -4,7 +4,9 @@
 # PACKAGE DEPLOYMENT NOTES:
 # Ensure the following packages are added to the 'Imports' section of your
 # package's DESCRIPTION file:
-# Imports: shiny, dplyr, readr, tigris, sf, freestiler, mapgl, bslib, classInt, scales, httpuv, servr
+# Imports: shiny, dplyr, readr, tigris, sf, freestiler, mapgl, bslib, classInt,
+#          scales, httpuv, servr, htmlwidgets
+# Suggests: rmapshaper
 # ==============================================================================
 
 library(shiny)
@@ -19,6 +21,7 @@ library(classInt)
 library(scales)
 library(httpuv)
 library(servr)
+library(htmlwidgets)
 
 # ------------------------------------------------------------------------------
 # Global Options & Initializations
@@ -157,7 +160,7 @@ build_popup_html <- function(selected_var, segment_label = "All Workers") {
   dynamic_header <- ""
   if (selected_var != "total_jobs") {
     dynamic_header <- paste0(
-      "<div style='font-size: 1.2em; font-weight: 600; color: #0284c7; margin-bottom: 6px;'>",
+      "<div style='font-size: 1.2em; font-weight: 600; color: #0284c7; margin-bottom: 2px;'>",
       label_text, ": <b>{", selected_var, "_fmt}</b> <i>({", selected_var, "_pct})</i></div>"
     )
   }
@@ -168,7 +171,8 @@ build_popup_html <- function(selected_var, segment_label = "All Workers") {
       <div style='font-size: 1.2em; color: #4b5563; margin-bottom: 4px;'><b>Workforce Segment:</b> ", segment_label, "</div>
       <div style='font-size: 1.2em; color: #111827; margin-bottom: 2px;'>Total Segment Workers: <b>{total_jobs_fmt}</b></div>
       ", dynamic_header, "
-      <div style='font-size: 1.2em; color: #6b7280; margin-bottom: 2px;'><b>Workforce Segment Details</b></div>
+      <div style='font-size: 0.85em; color: #6b7280; font-style: italic; margin-bottom: 6px;'>Note: Totals reflect the complete selected workforce segment for this area, not the slider-filtered subset.</div>
+
 
       <hr style='margin: 8px 0; border: 0; border-top: 1px solid #e5e7eb;'/>
 
@@ -194,7 +198,7 @@ build_popup_html <- function(selected_var, segment_label = "All Workers") {
         </div>
 
         <div style='flex: 1;'>
-          <b>By Broad Industry Sector</b><br/>
+          <b>By Industry Sector (Broad)</b><br/>
           Goods Producing: {ind_goods_fmt} <i>({ind_goods_pct})</i><br/>
           Trade & Transportation: {ind_trade_fmt} <i>({ind_trade_pct})</i><br/>
           Services: {ind_service_fmt} <i>({ind_service_pct})</i><br/>
@@ -234,6 +238,38 @@ get_legend_title_text <- function(selected_var, metric_type) {
   return(base_label)
 }
 
+get_map_title_html <- function(area_name, year, job_type, segment_label, map_var, metric_type) {
+  job_type_labels <- c(
+    "JT00" = "All Jobs",
+    "JT01" = "Primary Jobs",
+    "JT02" = "All Private Jobs",
+    "JT03" = "Private Primary Jobs",
+    "JT04" = "All Federal Jobs",
+    "JT05" = "Federal Primary Jobs"
+  )
+  job_type_str <- job_type_labels[[job_type]]
+  var_label <- var_labels[[map_var]]
+
+  metric_str <- if (map_var != "total_jobs" && metric_type == "share") " (Share of Segment)" else " (Absolute Count)"
+  if (map_var == "total_jobs") metric_str <- ""
+
+  paste0(
+    "<div style='background: rgba(255, 255, 255, 0.95); padding: 12px 16px; border-radius: 8px; ",
+    "box-shadow: 0 4px 12px rgba(0,0,0,0.18); font-family: system-ui, -apple-system, sans-serif; ",
+    "backdrop-filter: blur(6px); border: 1px solid rgba(0,0,0,0.1); max-width: 440px; line-height: 1.45; pointer-events: auto;'>",
+    "  <div style='font-size: 1.4em; font-weight: 700; color: #1e3a8a; margin-bottom: 4px;'>",
+    area_name, " (", year, ")",
+    "  </div>",
+    "  <div style='font-size: 1.05em; color: #374151; margin-bottom: 4px;'>",
+    "    <b>Jobs:</b> ", job_type_str, " | <b>Segment:</b> ", segment_label,
+    "  </div>",
+    "  <div style='font-size: 1.15em; font-weight: 600; color: #0284c7;'>",
+    "    <b>Mapped Data:</b> ", var_label, metric_str,
+    "  </div>",
+    "</div>"
+  )
+}
+
 # ------------------------------------------------------------------------------
 # User Interface
 # ------------------------------------------------------------------------------
@@ -261,6 +297,35 @@ ui <- page_sidebar(
           padding: 12px 16px !important;
           border-radius: 8px !important;
           box-shadow: 0 4px 16px rgba(0,0,0,0.2) !important;
+        }
+
+        .bslib-card .card-body {
+          position: relative;
+          padding: 0 !important;
+          overflow: hidden !important;
+          height: 100% !important;
+        }
+        #map {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100% !important;
+          height: 100% !important;
+        }
+        .splash-overlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: #ffffff;
+          z-index: 600;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          padding: 40px;
         }
       "))
     ),
@@ -389,7 +454,11 @@ ui <- page_sidebar(
       sep = ","
     ),
 
-    downloadButton("download_data", "Download Current Data (CSV)", class = "btn-outline-primary w-100"),
+    div(
+      class = "d-grid gap-2",
+      downloadButton("download_html", "Download Standalone Map (.html)", class = "btn-success w-100"),
+      downloadButton("download_data", "Download Current Data (CSV)", class = "btn-outline-primary w-100")
+    ),
 
     hr(),
 
@@ -402,13 +471,20 @@ ui <- page_sidebar(
     full_screen = TRUE,
     card_body(
       padding = 0,
-      style = "position: relative;",
-      # Dynamic overlay box managed cleanly by Shiny's DOM engine
+      maplibreOutput("map", height = "100%", width = "100%"),
       div(
         style = "position: absolute; top: 12px; left: 12px; z-index: 500; pointer-events: none;",
         uiOutput("map_title_overlay")
       ),
-      maplibreOutput("map")
+      conditionalPanel(
+        condition = "!output.map_ready",
+        class = "splash-overlay",
+        div(
+          h2("LODES RAC Explorer", style = "color: #1e3a8a; font-weight: 700;"),
+          p("Select a state and your desired dataset parameters in the sidebar, then click 'Fetch Data & Rebuild Map' to begin.",
+            style = "font-size: 1.15em; color: #4b5563; max-width: 480px; margin: 12px auto;")
+        )
+      )
     )
   )
 )
@@ -421,6 +497,9 @@ server <- function(input, output, session) {
   # Reactive state storing spatial data, PMTiles URL, and metadata
   map_state <- reactiveVal(NULL)
 
+  output$map_ready <- reactive({ !is.null(map_state()) })
+  outputOptions(output, "map_ready", suspendWhenHidden = FALSE)
+
   # Evaluate the proper dataset column mapping based on variable and absolute/share inputs
   active_map_column <- reactive({
     if (input$map_var == "total_jobs") return("total_jobs")
@@ -432,35 +511,9 @@ server <- function(input, output, session) {
   output$map_title_overlay <- renderUI({
     req(map_state())
     active <- map_state()
-
-    job_type_labels <- c(
-      "JT00" = "All Jobs",
-      "JT01" = "Primary Jobs",
-      "JT02" = "All Private Jobs",
-      "JT03" = "Private Primary Jobs",
-      "JT04" = "All Federal Jobs",
-      "JT05" = "Federal Primary Jobs"
-    )
-    job_type_str <- job_type_labels[[active$job_type]]
-    var_label <- var_labels[[input$map_var]]
-
-    metric_str <- if (input$map_var != "total_jobs" && input$metric_type == "share") " (Share of Segment)" else " (Absolute Count)"
-    if (input$map_var == "total_jobs") metric_str <- ""
-
-    HTML(paste0(
-      "<div style='background: rgba(255, 255, 255, 0.95); padding: 12px 16px; border-radius: 8px; ",
-      "box-shadow: 0 4px 12px rgba(0,0,0,0.18); font-family: system-ui, -apple-system, sans-serif; ",
-      "backdrop-filter: blur(6px); border: 1px solid rgba(0,0,0,0.1); max-width: 440px; line-height: 1.45; pointer-events: auto;'>",
-      "  <div style='font-size: 1.4em; font-weight: 700; color: #1e3a8a; margin-bottom: 4px;'>",
-      active$state_name, " (", active$year, ")",
-      "  </div>",
-      "  <div style='font-size: 1.05em; color: #374151; margin-bottom: 4px;'>",
-      "    <b>Jobs:</b> ", job_type_str, " | <b>Segment:</b> ", active$segment_label,
-      "  </div>",
-      "  <div style='font-size: 1.15em; font-weight: 600; color: #0284c7;'>",
-      "    <b>Mapped Data:</b> ", var_label, metric_str,
-      "  </div>",
-      "</div>"
+    HTML(get_map_title_html(
+      active$state_name, active$year, active$job_type,
+      active$segment_label, input$map_var, input$metric_type
     ))
   })
 
@@ -517,7 +570,8 @@ server <- function(input, output, session) {
   })
 
   # Base Map/Data Pipeline
-  observeEvent(input$update_map, ignoreNULL = FALSE, {
+  observeEvent(input$update_map, {
+    req(input$update_map > 0)
 
     # Isolate inputs to prevent reactive triggering during configuration
     state_val      <- isolate(input$state)
@@ -772,7 +826,6 @@ server <- function(input, output, session) {
       scales::comma(round(new_props$breaks))
     }
 
-    # Scale filter thresholds depending on whether mapping shares (decimals 0-1) or absolute counts
     if (is_share) {
       min_val <- input$jobs_filter[1] / 100
       max_val <- input$jobs_filter[2] / 100
@@ -813,6 +866,116 @@ server <- function(input, output, session) {
         position = "bottom-left"
       )
   }, ignoreInit = TRUE)
+
+  # Standalone Self-Contained HTML Exporter
+  output$download_html <- downloadHandler(
+    filename = function() {
+      req(map_state())
+      paste0(isolate(map_state()$state_lower), "_standalone_lodes_rac_", tolower(isolate(input$segment)), "_", isolate(input$geo_level), "_", isolate(input$map_var), ".html")
+    },
+    content = function(file) {
+      req(map_state())
+      active <- map_state()
+      col_to_map <- active_map_column()
+      is_share <- (input$map_var != "total_jobs" && input$metric_type == "share")
+
+      withProgress(message = "Generating Standalone HTML Snapshot...", value = 0.2, {
+
+        # 1. Filter export features by the current slider range
+        if (is_share) {
+          min_val <- input$jobs_filter[1] / 100
+          max_val <- input$jobs_filter[2] / 100
+        } else {
+          min_val <- input$jobs_filter[1]
+          max_val <- input$jobs_filter[2]
+        }
+
+        export_sf <- active$sf |>
+          filter(!is.na(.data[[col_to_map]]),
+                 .data[[col_to_map]] >= min_val,
+                 .data[[col_to_map]] <= max_val)
+
+        incProgress(0.3, detail = "Pruning attributes & simplifying geometry")
+
+        # 2. Prune unused columns to reduce GeoJSON payload size
+        popup_fields <- c(
+          "display_name", "total_jobs_fmt",
+          "age_under_30_fmt", "age_under_30_pct", "age_30_to_54_fmt", "age_30_to_54_pct", "age_over_55_fmt", "age_over_55_pct",
+          "earn_low_fmt", "earn_low_pct", "earn_mid_fmt", "earn_mid_pct", "earn_high_fmt", "earn_high_pct",
+          "edu_less_hs_fmt", "edu_less_hs_pct", "edu_hs_fmt", "edu_hs_pct", "edu_some_college_fmt", "edu_some_college_pct", "edu_bachelors_fmt", "edu_bachelors_pct",
+          "ind_goods_fmt", "ind_goods_pct", "ind_trade_fmt", "ind_trade_pct", "ind_service_fmt", "ind_service_pct",
+          "race_white_fmt", "race_white_pct", "race_black_fmt", "race_black_pct", "race_native_fmt", "race_native_pct", "race_asian_fmt", "race_asian_pct", "race_pacific_fmt", "race_pacific_pct", "race_two_plus_fmt", "race_two_plus_pct",
+          "eth_hispanic_fmt", "eth_hispanic_pct", "eth_not_hispanic_fmt", "eth_not_hispanic_pct",
+          "sex_male_fmt", "sex_male_pct", "sex_female_fmt", "sex_female_pct",
+          paste0(input$map_var, "_fmt"), paste0(input$map_var, "_pct")
+        )
+        keep_cols <- unique(c(col_to_map, popup_fields))
+        export_sf <- export_sf |> select(any_of(keep_cols))
+
+        # 3. Simplify geometry to keep file size lightweight
+        if (requireNamespace("rmapshaper", quietly = TRUE)) {
+          export_sf <- rmapshaper::ms_simplify(export_sf, keep = 0.15, keep_shapes = TRUE)
+        } else {
+          export_sf <- sf::st_simplify(export_sf, preserveTopology = TRUE, dTolerance = 0.001)
+        }
+        export_sf <- st_transform(export_sf, 4326)
+
+        incProgress(0.3, detail = "Rendering interactive HTML map")
+
+        # 4. Construct the standalone widget (embedding GeoJSON directly)
+        new_props <- get_dynamic_props(export_sf, col_to_map)
+        new_popup <- build_popup_html(input$map_var, active$segment_label)
+        new_legend_title <- get_legend_title_text(input$map_var, input$metric_type)
+        new_legend_vals <- if (is_share) scales::percent(new_props$breaks, accuracy = 0.1) else scales::comma(round(new_props$breaks))
+
+        title_html <- paste0(
+          "<style>",
+          ".maplibregl-popup, .mapboxgl-popup { max-width: none !important; z-index: 1000 !important; }",
+          ".maplibregl-popup-content, .mapboxgl-popup-content { padding: 12px 16px !important; border-radius: 8px !important; box-shadow: 0 4px 16px rgba(0,0,0,0.2) !important; }",
+          "</style>",
+          get_map_title_html(active$state_name, active$year, active$job_type, active$segment_label, input$map_var, input$metric_type)
+        )
+
+        standalone_map <- maplibre(
+          style = carto_style("positron"),
+          bounds = st_bbox(export_sf)
+        ) |>
+          add_fill_layer(
+            id = "jobs_fill",
+            source = export_sf,
+            fill_color = interpolate(
+              column = col_to_map,
+              values = new_props$breaks,
+              stops = new_props$colors
+            ),
+            fill_opacity = 0.7,
+            hover_options = list(fill_opacity = 1),
+            popup = new_popup
+          ) |>
+          add_legend(
+            legend_title = new_legend_title,
+            values = new_legend_vals,
+            filter_values = new_props$breaks,
+            colors = new_props$colors,
+            type = "continuous",
+            width = "350px",
+            position = "bottom-left"
+          ) |>
+          add_navigation_control(position = "top-right") |>
+          add_fullscreen_control(position = "top-right") |>
+          add_scale_control(position = "bottom-left") |>
+          add_control(html = title_html, position = "top-left")
+
+        incProgress(0.2, detail = "Saving self-contained file")
+
+        # 5. Save out via temporary file to prevent connection errors
+        temp_html <- file.path(tempdir(), paste0("export_", as.numeric(Sys.time()), ".html"))
+        saveWidget(standalone_map, file = temp_html, selfcontained = TRUE)
+        file.copy(temp_html, file, overwrite = TRUE)
+        unlink(temp_html)
+      })
+    }
+  )
 
   # CSV Data Downloader
   output$download_data <- downloadHandler(
