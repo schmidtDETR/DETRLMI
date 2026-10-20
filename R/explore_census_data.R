@@ -29,15 +29,22 @@ explore_census_data <- function() {
 #' filter, and download data from the LEHD Residence Area Characteristics (RAC) file.
 #'
 #' @import shiny
+#' @param regional Logical. If FALSE (default), runs the Shiny app for a single state.  If TRUE, allows the selection of multiple states.  NOTE: running multiple states will significantly increase processing times.
 #' @export
 #'
 #' @examples
 #' \dontrun{
 #' DETRLMI::explore_rac()
 #' }
-explore_rac <- function() {
+explore_rac <- function(regional = FALSE) {
   # Locate the app inside the installed package
-  app_dir <- system.file("shiny", "rac_explorer", package = "DETRLMI")
+  if(regional){
+    app_dir <- system.file("shiny", "rac_explorer_multistate", package = "DETRLMI")
+    message("Using Multistate RAC Explorer app.")
+  } else {
+    app_dir <- system.file("shiny", "rac_explorer", package = "DETRLMI")
+    message("Using single state RAC Explorer app. Set parameter `regional = TRUE`` to use multi-state explorer.")
+  }
 
   # Error handling just in case the folder goes missing
   if (app_dir == "") {

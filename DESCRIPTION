@@ -1,36 +1,42 @@
 Package: DETRLMI
 Type: Package
 Title: Useful tools by DETR LMI
-Version: 0.6
+Version: 0.7
 Authors@R: c(
     person("David", "Schmidt", email = "deschmidt@detr.nv.gov", role = c("aut", "cre")),
     person("Antonio", "Solorio", email = "aisolorio@detr.nv.gov", role = "aut"))
 Description: Collection of useful functions compiled by DETR LMI
 License: LMI
 Encoding: UTF-8
+Depends:
+    R (>= 4.1.0)
 Imports:
-    data.table (>= 1.16),
-    dplyr (>= 1.1),
-    httr (>= 1.4.7),
-    jsonlite (>= 1.8.8),
-    lubridate (>= 1.9),
-    tibble (>= 3.2.1),
-    ggplot2 (>= 3.5),
     alfred (>= 0.2.1),
     BLSloadR,
-    RODBC,
-    rappdirs,
-    shiny,
-    tidycensus,
-    stringr,
-    purrr,
+    cli,
+    data.table (>= 1.16),
+    dplyr (>= 1.1),
+    ggplot2 (>= 3.5),
+    htmlwidgets,
+    httr (>= 1.4.7),
+    httr2 (>= 1.0.0),
+    jsonlite (>= 1.8.8),
+    lubridate (>= 1.9),
     mapgl,
-    tigris,
-    sf,
-    stats,
+    purrr,
+    rappdirs,
     rlang,
-    htmlwidgets
+    RODBC,
+    sf,
+    shiny,
+    stats,
+    stringr,
+    tibble (>= 3.2.1),
+    tidycensus,
+    tigris,
+    utils
 RoxygenNote: 7.3.3
 Suggests: 
+    clipr,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
