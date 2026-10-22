@@ -9,7 +9,8 @@ fetch_qwi_comparison(
   industries = c("23", "72"),
   years = 2020:2022,
   indicators = c("Emp", "EarnS"),
-  endpoint = "sa"
+  endpoint = "sa",
+  geo_file = NULL
 )
 }
 \arguments{
@@ -70,6 +71,8 @@ Supported options include:
   \item \code{"se"}: Sex by Education
   \item \code{"rh"}: Race by Ethnicity
 }}
+
+\item{geo_file}{Optional local path to \code{label_geography.csv}. If \code{NULL}, fetches and caches from LEHD.}
 }
 \value{
 A stacked, tidy tibble with standardized \code{region}, \code{industry_code},
