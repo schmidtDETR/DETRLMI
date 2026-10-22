@@ -13,6 +13,3 @@ A named character vector of NAICS sector codes and titles.
 Returns a named character vector mapping 2-digit NAICS sector codes
 to industry titles.
 }
-\examples{
-qwi_dict_industries()
-}

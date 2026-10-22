@@ -14,25 +14,6 @@ generate_qwi_script(
   var_name = "qwi_data"
 )
 }
-\arguments{
-\item{endpoint}{A list containing endpoint metadata (`id`, `title`, and `vars`).}
-
-\item{years}{Numeric vector of years (e.g., `2020:2022`). Default is `2022`.}
-
-\item{geography}{Geography level (e.g., `"state"`, `"county"`, `"cbsa"`, `"wia"`). Default is `"county"`.}
-
-\item{state_fips}{Two-digit state FIPS code as a string (e.g., `"06"`). Default is `"06"`.}
-
-\item{indicators}{Character vector of QWI indicator codes. Default is `c("Emp")`.}
-
-\item{industry}{Optional NAICS industry code (e.g., `"31-33"`). Default is `NULL`.}
-
-\item{var_name}{Character variable name assigned in the generated script. Default is `"qwi_data"`.}
-}
-\value{
-A character string containing the generated R script.
-}
 \description{
-Constructs a standalone, reproducible R script string configured to download
-specified QWI data using `get_qwi_chunk()`.
+Generate R Script for QWI Extraction
 }

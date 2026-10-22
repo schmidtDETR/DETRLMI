@@ -6,15 +6,6 @@
 \usage{
 qwi_wizard(output_dir = NULL, filename = NULL)
 }
-\arguments{
-\item{output_dir}{Optional destination folder where the script will be saved.}
-
-\item{filename}{Optional destination file name (e.g., `"my_qwi_extract.R"`).}
-}
-\value{
-Invisibly returns the normalized file path of the generated script.
-}
 \description{
-Launches an interactive console assistant that guides you through building
-a QWI API query and generates a ready-to-run R script.
+Interactive QWI Script Wizard
 }

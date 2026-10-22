@@ -13,7 +13,3 @@ A named character vector of indicator codes and descriptions.
 Returns a named character vector mapping Census QWI indicator codes
 to human-readable descriptions.
 }
-\examples{
-dict <- qwi_dict_indicators()
-dict["Emp"]
-}

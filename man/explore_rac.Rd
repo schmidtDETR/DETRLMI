@@ -4,7 +4,10 @@
 \alias{explore_rac}
 \title{Launch the Census LEHD RAC File Explorer}
 \usage{
-explore_rac()
+explore_rac(regional = FALSE)
+}
+\arguments{
+\item{regional}{Logical. If FALSE (default), runs the Shiny app for a single state.  If TRUE, allows the selection of multiple states.  NOTE: running multiple states will significantly increase processing times.}
 }
 \description{
 This function launches an interactive Shiny application to explore,

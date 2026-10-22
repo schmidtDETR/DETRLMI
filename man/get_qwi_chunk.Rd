@@ -2,44 +2,39 @@
 % Please edit documentation in R/qwi_wizard.R
 \name{get_qwi_chunk}
 \alias{get_qwi_chunk}
-\title{Fetch QWI Data Chunk}
+\title{Fetch QWI Data Chunk (Hybrid: API for Sub-National, LEHD Repository for US)}
 \usage{
 get_qwi_chunk(
   endpoint = "sa",
   get_vars = c("Emp", "sex", "agegrp"),
-  geography = "county",
-  state_fips,
-  years,
+  geography = "state",
+  state_fips = "00",
+  years = 2021,
   industry = NULL,
   key = Sys.getenv("CENSUS_API_KEY"),
   label_data = TRUE
 )
 }
 \arguments{
-\item{endpoint}{Character. The demographic crosstab endpoint: `"sa"` (Sex by Age),
-`"se"` (Sex by Education), or `"rh"` (Race by Ethnicity).}
+\item{endpoint}{Character. Demographic crosstab: `"sa"`, `"se"`, or `"rh"`.}
 
-\item{get_vars}{Character vector of indicators and demographic variables to retrieve.}
+\item{get_vars}{Character vector of indicators and demographic variables.}
 
-\item{geography}{Character. Geographic hierarchy: `"state"`, `"county"`, `"cbsa"`,
-or `"wia"`. Default is `"county"`.}
+\item{geography}{Character. Geographic level: `"us"`, `"state"`, `"county"`, `"cbsa"`, or `"wia"`.}
 
-\item{state_fips}{Two-digit state FIPS code as a string (e.g., `"06"` for California).}
+\item{state_fips}{Two-digit state FIPS code, 2-letter abbreviation (e.g. `"NV"`), or `"00"`/`"US"`.}
 
 \item{years}{Numeric vector of years (e.g., `2020:2022`).}
 
 \item{industry}{Optional NAICS industry code (e.g., `"31-33"`). Default is `NULL`.}
 
-\item{key}{Census API Key. Defaults to the `CENSUS_API_KEY` environment variable.}
+\item{key}{Census API Key. Defaults to `CENSUS_API_KEY` environment variable.}
 
-\item{label_data}{Logical. If `TRUE` (default), appends human-readable `*_label`
-columns for demographic codes.}
+\item{label_data}{Logical. If `TRUE` (default), appends readable demographic labels.}
 }
 \value{
-A data frame containing the requested QWI observations with numeric
-  indicators converted to numeric types.
+A data frame containing the requested QWI observations.
 }
 \description{
-Queries the U.S. Census Bureau LEHD Quarterly Workforce Indicators (QWI) API
-for specified indicators, geographic levels, and years.
+Fetch QWI Data Chunk (Hybrid: API for Sub-National, LEHD Repository for US)
 }
