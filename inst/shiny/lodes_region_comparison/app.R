@@ -1,6 +1,6 @@
 # ==============================================================================
 # LODES Dynamic Multi-Region Builder & RAC/WAC/OD Comparator
-# (with JSON Region Import/Export, Standalone R Script Export & PDF Report)
+# (with Comparison Charts, JSON Region Import/Export, Standalone R Script & PDF)
 #
 # Required Packages:
 # shiny, bslib, mapgl, tigris, sf, dplyr, readr, scales, DT, htmltools,
@@ -164,7 +164,7 @@ fetch_geo_robustly <- function(geom_type, state_id) {
     args <- list(cb = use_cb, progress_bar = FALSE)
     if (!is.null(target_year)) args$year <- target_year
     if (geom_type == "ZCTAs" && is.null(target_year)) args$year <- 2020
-    
+
     state_level_geoms <- c(
       "Counties", "Tracts", "Block Groups", "PUMAs",
       "County Subdivisions", "Census Places", "School Districts",
@@ -174,7 +174,7 @@ fetch_geo_robustly <- function(geom_type, state_id) {
     if (geom_type %in% state_level_geoms) args$state <- state_id
     if (geom_type == "Lower State Legislative Districts") args$house <- "lower"
     if (geom_type == "Upper State Legislative Districts") args$house <- "upper"
-    
+
     raw_shape <- switch(
       geom_type,
       "Full State" = {
@@ -195,7 +195,7 @@ fetch_geo_robustly <- function(geom_type, state_id) {
       "Urban Areas"                       = do.call(tigris::urban_areas, args),
       "Voting Districts"                  = do.call(tigris::voting_districts, args)
     )
-    
+
     national_geoms <- c("ZCTAs", "Core-based Areas", "Urban Areas")
     if (geom_type %in% national_geoms) {
       state_args <- list(cb = use_cb, progress_bar = FALSE)
@@ -203,14 +203,14 @@ fetch_geo_robustly <- function(geom_type, state_id) {
       state_boundary <- do.call(tigris::states, state_args)
       state_boundary <- state_boundary[state_boundary$STUSPS == state_id, ]
       state_boundary <- sf::st_transform(state_boundary, sf::st_crs(raw_shape))
-      
+
       intersects <- suppressMessages(sf::st_intersects(raw_shape, state_boundary, sparse = FALSE)[, 1])
       touches    <- suppressMessages(sf::st_touches(raw_shape, state_boundary, sparse = FALSE)[, 1])
       raw_shape  <- raw_shape[intersects & !touches, ]
     }
     raw_shape
   }
-  
+
   tryCatch(call_tigris(TRUE), error = function(e1) {
     tryCatch(call_tigris(TRUE, 2020), error = function(e2) {
       tryCatch(call_tigris(FALSE), error = function(e3) {
@@ -225,9 +225,9 @@ build_standardized_layer <- function(geom_type, state_id) {
   possible_ids <- c("GEOID", "GEOID20", "GEOID10", "ZCTA5CE20", "ZCTA5CE10")
   id_col <- intersect(possible_ids, names(raw_data))[1]
   if (is.na(id_col)) id_col <- grep("^GEOID|^ZCTA", names(raw_data), value = TRUE)[1]
-  
+
   name_col <- intersect(c("NAMELSAD", "NAME", "NAMELSAD20", "NAME20"), names(raw_data))[1]
-  
+
   raw_data |>
     mutate(
       MAP_GEOID  = as.character(.data[[id_col]]),
@@ -302,7 +302,7 @@ build_region_popup <- function(reg_name, wac_row, rac_row, segment_label) {
     pct <- if (!is.null(tot) && tot > 0) scales::percent(val / tot, accuracy = 0.1) else "0.0%"
     paste0(scales::comma(val), " <i>(", pct, ")</i>")
   }
-  
+
   fmt_ratio <- function(col) {
     w_val <- wac_row[[col]]
     r_val <- rac_row[[col]]
@@ -312,9 +312,9 @@ build_region_popup <- function(reg_name, wac_row, rac_row, segment_label) {
       "—"
     }
   }
-  
+
   overall_ratio <- fmt_ratio("total_jobs")
-  
+
   paste0(
     "<div style='font-family: system-ui, -apple-system, sans-serif; min-width: 630px; max-height: 560px; overflow-y: auto; line-height: 1.4;'>",
     "  <div style='font-size: 1.35em; font-weight: 700; color: #1e3a8a;'>", reg_name, "</div>",
@@ -367,17 +367,17 @@ clean_pdf_label <- function(raw_lbl) {
 
 summarize_top_groups <- function(totals_df, meta) {
   demo_cats <- c("Age", "Earnings", "Education", "Race", "Ethnicity", "Sex", "Broad Industry")
-  
+
   lapply(seq_len(nrow(meta)), function(i) {
     rid   <- meta$region_id[i]
     rname <- meta$region_name[i]
     row   <- totals_df |> filter(region_id == rid)
     tot   <- row$total_jobs[1]
-    
+
     demo_rows <- lapply(demo_cats, function(cat_name) {
       sub_cat <- metric_catalog |> filter(category == cat_name)
       vals <- vapply(sub_cat$var, function(v) row[[v]][1], numeric(1))
-      
+
       if (cat_name == "Ethnicity") {
         sel_idx <- which(sub_cat$var == "eth_hispanic")
       } else {
@@ -394,25 +394,25 @@ summarize_top_groups <- function(totals_df, meta) {
           sel_idx <- ord[1]
         }
       }
-      
+
       item_strs <- vapply(sel_idx, function(idx) {
         val <- vals[idx]
         lbl <- clean_pdf_label(sub_cat$label[idx])
         pct <- if (tot > 0) scales::percent(val / tot, accuracy = 0.1) else "0.0%"
         paste0(lbl, " (", scales::comma(val), " | ", pct, ")")
       }, character(1))
-      
+
       tibble(
         Region    = rname,
         Category  = cat_name,
         Highlight = paste(item_strs, collapse = "LINEBREAKHERE")
       )
     }) |> bind_rows()
-    
+
     naics_cat <- metric_catalog |> filter(category == "2-Digit NAICS")
     n_vals <- vapply(naics_cat$var, function(v) row[[v]][1], numeric(1))
     pos_naics <- which(n_vals > 0)
-    
+
     if (length(pos_naics) == 0) {
       naics_row <- tibble(Region = rname, Category = "Top NAICS Codes", Highlight = "—")
     } else {
@@ -423,14 +423,14 @@ summarize_top_groups <- function(totals_df, meta) {
         naics_code_only <- sub(":.*$", "", naics_cat$label[idx])
         paste0(naics_code_only, " (", scales::comma(val), " | ", pct, ")")
       }, character(1))
-      
+
       naics_row <- tibble(
         Region    = rname,
         Category  = "Top NAICS Codes",
         Highlight = paste(top3_strs, collapse = "LINEBREAKHERE")
       )
     }
-    
+
     bind_rows(demo_rows, naics_row)
   }) |> bind_rows()
 }
@@ -456,9 +456,9 @@ generate_standalone_r_script <- function(regs, year_val, jt_val, seg_val, exclud
       "  )"
     )
   }, character(1))
-  
+
   regions_def_code <- paste0("regions_def <- list(\n", paste(reg_entries, collapse = ",\n"), "\n)")
-  
+
   script_lines <- c(
     "# ==============================================================================",
     "# Standalone LODES Multi-Region RAC / WAC / OD Analysis & PDF Report Generator",
@@ -988,7 +988,7 @@ generate_standalone_r_script <- function(regs, year_val, jt_val, seg_val, exclud
     ")",
     "message('Saved PDF report to: ', pdf_out_path)"
   )
-  
+
   paste(script_lines, collapse = "\n")
 }
 
@@ -1001,7 +1001,7 @@ ui <- page_sidebar(
     width = "410px",
     padding = c("10px", "14px"),
     gap = "8px",
-    
+
     tags$head(tags$style(HTML("
       .maplibregl-popup { max-width: none !important; z-index: 1000 !important; }
       .maplibregl-popup-content {
@@ -1019,6 +1019,8 @@ ui <- page_sidebar(
       }
       .compact-file-input .form-group { margin-bottom: 0 !important; }
       .compact-file-input .shiny-input-container { margin-bottom: 0 !important; }
+      .chart-controls-bar .form-group { margin-bottom: 0 !important; }
+      .chart-controls-bar .shiny-input-container { margin-bottom: 0 !important; }
       table.dataTable thead th.group-header-counts {
         background-color: #eff6ff !important;
         color: #1e3a8a !important;
@@ -1049,12 +1051,12 @@ ui <- page_sidebar(
         text-align: right !important;
       }
     "))),
-    
+
     # --- STEP 1: BUILD CUSTOM REGIONS ---
     h5("1. Select Areas on Map", style = "color: #1e3a8a; font-weight: 700; margin-bottom: 2px;"),
     p(class = "text-muted", style = "font-size: 0.82em; margin-bottom: 4px;",
       "Click polygons or use the polygon draw tool (top-right). Switch states/geographies anytime—your staged selection persists until assigned."),
-    
+
     layout_columns(
       col_widths = c(5, 7),
       selectInput("state", "State:", choices = state_choices, selected = "NV"),
@@ -1065,7 +1067,7 @@ ui <- page_sidebar(
         "Upper State Legislative Districts", "Urban Areas", "Voting Districts"
       ), selected = "Counties")
     ),
-    
+
     div(
       style = "background: #f1f5f9; padding: 8px; border-radius: 6px; font-size: 0.88em;",
       div(style = "font-weight: 600; margin-bottom: 4px;", textOutput("staged_summary")),
@@ -1076,9 +1078,9 @@ ui <- page_sidebar(
         actionButton("clear_staged", "Clear", class = "btn-outline-secondary btn-sm")
       )
     ),
-    
+
     hr(style = "margin: 6px 0;"),
-    
+
     # --- STEP 2: DYNAMICALLY ADD, NAME, IMPORT/EXPORT, RESET & DELETE REGIONS ---
     div(
       style = "display: flex; justify-content: space-between; align-items: center; gap: 4px; flex-wrap: wrap;",
@@ -1090,7 +1092,7 @@ ui <- page_sidebar(
         actionButton("reset_all_regions_btn", "Reset All", class = "btn-outline-danger btn-sm", style = "padding: 2px 6px; font-size: 0.8em;", title = "Remove all regions, names, and selections and start over")
       )
     ),
-    
+
     # Import / Export Saved Region Definitions
     div(
       style = "background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; padding: 6px 8px; font-size: 0.82em;",
@@ -1112,20 +1114,20 @@ ui <- page_sidebar(
         )
       )
     ),
-    
+
     div(
       style = "max-height: 220px; overflow-y: auto; padding-right: 2px;",
       uiOutput("dynamic_regions_ui")
     ),
-    
+
     checkboxInput(
       "exclude_higher_overlap",
       "Exclude higher-ranked regions' overlap from lower regions (e.g., R1 from R2, R1–R2 from R3)",
       value = FALSE
     ),
-    
+
     hr(style = "margin: 6px 0;"),
-    
+
     # --- STEP 3: LODES PARAMETERS & RUN ---
     h5("3. LODES Parameters & Compare", style = "color: #1e3a8a; font-weight: 700; margin-bottom: 2px;"),
     layout_columns(
@@ -1134,10 +1136,10 @@ ui <- page_sidebar(
       selectInput("job_type", "Job Type:", choices = job_type_choices, selected = "JT00")
     ),
     selectInput("segment", "Workforce Segment:", choices = segment_choices, selected = "S000"),
-    
+
     actionButton("run_comparison", "Fetch RAC, WAC & OD Data", class = "btn-success w-100 fw-bold")
   ),
-  
+
   navset_card_tab(
     id = "main_tabs",
     nav_panel(
@@ -1152,13 +1154,18 @@ ui <- page_sidebar(
       uiOutput("report_ui")
     ),
     nav_panel(
-      title = "3. Regional Profile Map (RAC & WAC)",
+      title = "3. Regional Comparison Charts",
+      value = "charts_tab",
+      uiOutput("charts_ui")
+    ),
+    nav_panel(
+      title = "4. Regional Profile Map (RAC & WAC)",
       value = "profile_map_tab",
       fillable = TRUE,
       maplibreOutput("profile_map", height = "calc(100vh - 135px)", width = "100%")
     ),
     nav_panel(
-      title = "4. OD Commuting Flows",
+      title = "5. OD Commuting Flows",
       value = "od_tab",
       uiOutput("od_ui")
     )
@@ -1169,20 +1176,20 @@ ui <- page_sidebar(
 # Server Logic
 # ------------------------------------------------------------------------------
 server <- function(input, output, session) {
-  
+
   staged_sf          <- reactiveVal(NULL)
   comparison_results <- reactiveVal(NULL)
   next_reg_num       <- reactiveVal(3)
-  
+
   make_default_regions <- function() {
     list(
       R1 = list(id = "R1", name = "Custom Region 1", color = region_palette[1], sf = NULL),
       R2 = list(id = "R2", name = "Custom Region 2", color = region_palette[2], sf = NULL)
     )
   }
-  
+
   regions_store <- reactiveVal(make_default_regions())
-  
+
   sync_region_names <- function(regs) {
     for (rid in names(regs)) {
       inp_val <- isolate(input[[paste0("name_", rid)]])
@@ -1192,7 +1199,7 @@ server <- function(input, output, session) {
     }
     regs
   }
-  
+
   # ----------------------------------------------------------------------------
   # Master Reset All Regions, Names, Colors & Selections
   # ----------------------------------------------------------------------------
@@ -1215,7 +1222,7 @@ server <- function(input, output, session) {
       duration = 3
     )
   })
-  
+
   # ----------------------------------------------------------------------------
   # Export / Import Region Definitions (JSON)
   # ----------------------------------------------------------------------------
@@ -1226,7 +1233,7 @@ server <- function(input, output, session) {
     content = function(file) {
       regs <- sync_region_names(regions_store())
       regions_store(regs)
-      
+
       payload <- list(
         version = 1,
         exported_at = as.character(Sys.time()),
@@ -1253,32 +1260,32 @@ server <- function(input, output, session) {
           )
         }))
       )
-      
+
       writeLines(jsonlite::toJSON(payload, pretty = TRUE, auto_unbox = TRUE), file)
     }
   )
-  
+
   observeEvent(input$import_regions_file, {
     file_info <- input$import_regions_file
     req(file_info$datapath)
-    
+
     parsed <- tryCatch(
       jsonlite::fromJSON(file_info$datapath, simplifyVector = FALSE),
       error = function(e) NULL
     )
-    
+
     if (is.null(parsed) || is.null(parsed$regions) || length(parsed$regions) < 2) {
       showNotification("Invalid region definitions file. Please select a valid exported JSON file.", type = "error", duration = 6)
       return()
     }
-    
+
     withProgress(message = "Importing Region Definitions...", value = 0.1, {
       all_area_rows <- lapply(parsed$regions, function(reg_item) {
         if (length(reg_item$areas) == 0) return(NULL)
         bind_rows(lapply(reg_item$areas, as_tibble))
       })
       all_areas_df <- bind_rows(all_area_rows)
-      
+
       layer_lookup <- list()
       if (nrow(all_areas_df) > 0) {
         unique_pairs <- all_areas_df |> distinct(SRC_STATE, SRC_GEOM)
@@ -1289,27 +1296,27 @@ server <- function(input, output, session) {
           layer_lookup[[paste(st_k, gm_k, sep = "::")]] <- build_standardized_layer(gm_k, st_k)
         }
       }
-      
+
       new_regs <- list()
       max_r_idx <- 0
-      
+
       for (idx in seq_along(parsed$regions)) {
         reg_item <- parsed$regions[[idx]]
         rid <- if (!is.null(reg_item$id)) as.character(reg_item$id) else paste0("R", idx)
         num_part <- suppressWarnings(as.integer(sub("^R", "", rid)))
         if (!is.na(num_part) && num_part > max_r_idx) max_r_idx <- num_part
-        
+
         col_val <- if (!is.null(reg_item$color)) {
           as.character(reg_item$color)
         } else {
           region_palette[((idx - 1) %% length(region_palette)) + 1]
         }
-        
+
         reg_sf <- NULL
         if (length(reg_item$areas) > 0) {
           reg_areas_df <- bind_rows(lapply(reg_item$areas, as_tibble)) |>
             mutate(PAIR_KEY = paste(SRC_STATE, SRC_GEOM, sep = "::"))
-          
+
           sf_pieces <- lapply(split(reg_areas_df, reg_areas_df$PAIR_KEY), function(sub_df) {
             base_lyr <- layer_lookup[[sub_df$PAIR_KEY[1]]]
             if (is.null(base_lyr)) return(NULL)
@@ -1320,7 +1327,7 @@ server <- function(input, output, session) {
             reg_sf <- do.call(rbind, sf_pieces)
           }
         }
-        
+
         new_regs[[rid]] <- list(
           id    = rid,
           name  = as.character(reg_item$name),
@@ -1328,15 +1335,15 @@ server <- function(input, output, session) {
           sf    = reg_sf
         )
       }
-      
+
       regions_store(new_regs)
       next_reg_num(max(max_r_idx + 1, length(new_regs) + 1))
       staged_sf(NULL)
-      
+
       if (!is.null(parsed$exclude_higher_overlap)) {
         updateCheckboxInput(session, "exclude_higher_overlap", value = isTRUE(parsed$exclude_higher_overlap))
       }
-      
+
       imported_sfs <- Filter(function(x) !is.null(x) && nrow(x) > 0, lapply(new_regs, function(r) r$sf))
       if (length(imported_sfs) > 0) {
         combined_imp <- do.call(rbind, imported_sfs)
@@ -1345,7 +1352,7 @@ server <- function(input, output, session) {
         bbox <- as.numeric(st_bbox(combined_imp))
         maplibre_proxy("selector_map") |> fit_bounds(bbox, padding = 30)
       }
-      
+
       showNotification(
         paste0("Imported ", length(new_regs), " custom regions successfully."),
         type = "message",
@@ -1353,7 +1360,7 @@ server <- function(input, output, session) {
       )
     })
   })
-  
+
   # ----------------------------------------------------------------------------
   # Dynamic Region Management
   # ----------------------------------------------------------------------------
@@ -1361,7 +1368,7 @@ server <- function(input, output, session) {
     regs <- sync_region_names(regions_store())
     num  <- next_reg_num()
     new_id <- paste0("R", num)
-    
+
     used_colors <- vapply(regs, function(r) r$color, character(1))
     avail_colors <- setdiff(region_palette, used_colors)
     new_color <- if (length(avail_colors) > 0) {
@@ -1369,7 +1376,7 @@ server <- function(input, output, session) {
     } else {
       region_palette[((length(regs)) %% length(region_palette)) + 1]
     }
-    
+
     regs[[new_id]] <- list(
       id    = new_id,
       name  = paste0("Custom Region ", num),
@@ -1380,13 +1387,13 @@ server <- function(input, output, session) {
     next_reg_num(num + 1)
     updateSelectInput(session, "target_region", selected = new_id)
   })
-  
+
   observeEvent(input$update_names_btn, {
     regs <- sync_region_names(regions_store())
     regions_store(regs)
     showNotification("Region names updated.", type = "message", duration = 2)
   })
-  
+
   observeEvent(regions_store(), {
     regs <- regions_store()
     choices <- setNames(
@@ -1399,17 +1406,17 @@ server <- function(input, output, session) {
     }
     updateSelectInput(session, "target_region", choices = choices, selected = cur_sel)
   })
-  
+
   output$dynamic_regions_ui <- renderUI({
     regs <- regions_store()
     can_delete <- length(regs) > 2
-    
+
     lapply(seq_along(regs), function(idx) {
       r <- regs[[idx]]
       rid <- r$id
       n_areas <- if (is.null(r$sf)) 0 else nrow(r$sf)
       states_str <- if (n_areas > 0) paste0(" across ", paste(unique(r$sf$SRC_STATE), collapse = ", ")) else ""
-      
+
       div(
         class = "region-card",
         style = paste0("border-left: 5px solid ", r$color, ";"),
@@ -1458,20 +1465,20 @@ server <- function(input, output, session) {
       )
     })
   })
-  
+
   observe({
     regs <- regions_store()
     for (rid in names(regs)) {
       local({
         id <- rid
-        
+
         observeEvent(input[[paste0("stage_", id)]], {
           cur <- sync_region_names(regions_store())
           req(!is.null(cur[[id]]), !is.null(cur[[id]]$sf), nrow(cur[[id]]$sf) > 0)
-          
+
           moved_sf <- cur[[id]]$sf
           reg_label <- cur[[id]]$name
-          
+
           existing_staged <- staged_sf()
           if (is.null(existing_staged) || nrow(existing_staged) == 0) {
             staged_sf(moved_sf)
@@ -1479,25 +1486,25 @@ server <- function(input, output, session) {
             add_rows <- moved_sf |> filter(!UNIQUE_KEY %in% existing_staged$UNIQUE_KEY)
             staged_sf(rbind(existing_staged, add_rows))
           }
-          
+
           cur[[id]]$sf <- NULL
           regions_store(cur)
-          
+
           updateSelectInput(session, "target_region", selected = id)
-          
+
           updateTabsetPanel(session, "main_tabs", selected = "selector_tab")
           updateSelectInput(session, "state", selected = moved_sf$SRC_STATE[1])
           updateSelectInput(session, "geometry", selected = moved_sf$SRC_GEOM[1])
           bbox <- as.numeric(st_bbox(moved_sf))
           maplibre_proxy("selector_map") |> fit_bounds(bbox, padding = 30)
-          
+
           showNotification(
             paste0("Moved ", nrow(moved_sf), " area(s) from '", reg_label, "' to Staged Selection. Click polygons to add/remove, then click 'Add Areas'."),
             type = "message",
             duration = 5
           )
         }, ignoreInit = TRUE)
-        
+
         observeEvent(input[[paste0("reset_", id)]], {
           cur <- sync_region_names(regions_store())
           if (!is.null(cur[[id]])) {
@@ -1505,7 +1512,7 @@ server <- function(input, output, session) {
             regions_store(cur)
           }
         }, ignoreInit = TRUE)
-        
+
         observeEvent(input[[paste0("del_", id)]], {
           cur <- sync_region_names(regions_store())
           if (length(cur) > 2 && !is.null(cur[[id]])) {
@@ -1516,16 +1523,16 @@ server <- function(input, output, session) {
       })
     }
   })
-  
+
   # Fetch current state/geometry layer
   current_layer <- reactive({
     req(input$state, input$geometry)
     showNotification(paste("Loading", input$geometry, "for", input$state, "..."), id = "geo_load", duration = NULL)
     on.exit(removeNotification("geo_load"), add = TRUE)
-    
+
     build_standardized_layer(input$geometry, input$state)
   })
-  
+
   # Initialize MapLibre Selector Map directly with sf source
   output$selector_map <- renderMaplibre({
     layer <- isolate(current_layer()) |>
@@ -1533,7 +1540,7 @@ server <- function(input, output, session) {
         fill_col = "#94a3b8",
         fill_op  = 0.2
       )
-    
+
     maplibre(style = carto_style("positron"), bounds = as.numeric(st_bbox(layer))) |>
       add_navigation_control(position = "top-left") |>
       add_draw_control(
@@ -1562,27 +1569,27 @@ server <- function(input, output, session) {
         line_width = 1
       )
   })
-  
+
   observeEvent(current_layer(), {
     bbox <- as.numeric(st_bbox(current_layer()))
     maplibre_proxy("selector_map") |>
       fit_bounds(bbox, padding = 30)
   }, ignoreInit = TRUE)
-  
+
   observe({
     layer  <- current_layer()
     staged <- staged_sf()
     regs   <- regions_store()
-    
+
     staged_keys <- if (!is.null(staged)) staged$UNIQUE_KEY else character(0)
-    
+
     key_color_map <- character(0)
     for (r in rev(regs)) {
       if (!is.null(r$sf) && nrow(r$sf) > 0) {
         key_color_map[r$sf$UNIQUE_KEY] <- r$color
       }
     }
-    
+
     layer <- layer |>
       mutate(
         saved_col = unname(key_color_map[UNIQUE_KEY]),
@@ -1596,10 +1603,10 @@ server <- function(input, output, session) {
           TRUE ~ 0.2
         )
       )
-    
+
     legend_vals <- c("Staged Selection", vapply(regs, function(r) r$name, character(1)), "Unselected")
     legend_cols <- c("#e74c3c", vapply(regs, function(r) r$color, character(1)), "#94a3b8")
-    
+
     proxy <- maplibre_proxy("selector_map") |>
       clear_layer("base_fill") |>
       clear_layer("base_line") |>
@@ -1626,7 +1633,7 @@ server <- function(input, output, session) {
         type = "categorical",
         position = "bottom-right"
       )
-    
+
     other_list <- lapply(rev(regs), function(r) {
       if (!is.null(r$sf) && nrow(r$sf) > 0) {
         sub_sf <- r$sf |> filter(!UNIQUE_KEY %in% layer$UNIQUE_KEY)
@@ -1636,7 +1643,7 @@ server <- function(input, output, session) {
       } else NULL
     })
     other_sf <- do.call(rbind, Filter(Negate(is.null), other_list))
-    
+
     if (!is.null(other_sf) && nrow(other_sf) > 0) {
       proxy <- proxy |>
         add_fill_layer(
@@ -1647,7 +1654,7 @@ server <- function(input, output, session) {
           tooltip = "reg_tip"
         )
     }
-    
+
     if (!is.null(staged) && nrow(staged) > 0) {
       other_staged <- staged |>
         filter(!UNIQUE_KEY %in% layer$UNIQUE_KEY) |>
@@ -1664,19 +1671,19 @@ server <- function(input, output, session) {
       }
     }
   })
-  
+
   observeEvent(input$selector_map_feature_click, {
     click <- input$selector_map_feature_click
     req(!is.null(click$lng), !is.null(click$lat))
-    
+
     layer <- current_layer()
     pt <- st_sfc(st_point(c(click$lng, click$lat)), crs = 4326)
     hit_idx <- suppressMessages(which(st_intersects(layer, pt, sparse = FALSE)[, 1]))
     req(length(hit_idx) > 0)
-    
+
     clicked_row <- layer[hit_idx[1], ]
     clicked_key <- clicked_row$UNIQUE_KEY
-    
+
     cur <- staged_sf()
     if (is.null(cur) || nrow(cur) == 0) {
       staged_sf(clicked_row)
@@ -1687,7 +1694,7 @@ server <- function(input, output, session) {
       staged_sf(rbind(cur, clicked_row))
     }
   })
-  
+
   observeEvent(input$selector_map_drawn_features, {
     drawn <- get_drawn_features(maplibre_proxy("selector_map"))
     if (is.null(drawn) || nrow(drawn) == 0) {
@@ -1698,15 +1705,15 @@ server <- function(input, output, session) {
       )
     }
     req(!is.null(drawn), nrow(drawn) > 0)
-    
+
     layer <- current_layer()
     drawn <- sf::st_transform(drawn, sf::st_crs(layer)) |> sf::st_make_valid()
     layer_valid <- sf::st_make_valid(layer)
-    
+
     hits <- suppressMessages(sf::st_intersects(layer_valid, drawn, sparse = FALSE))
     hit_mask <- apply(hits, 1, any)
     hit_rows <- layer[hit_mask, ]
-    
+
     if (nrow(hit_rows) > 0) {
       cur <- staged_sf()
       if (is.null(cur) || nrow(cur) == 0) {
@@ -1716,29 +1723,29 @@ server <- function(input, output, session) {
         staged_sf(rbind(cur, new_rows))
       }
     }
-    
+
     clear_drawn_features(maplibre_proxy("selector_map"))
   })
-  
+
   output$staged_summary <- renderText({
     cur <- staged_sf()
     n <- if (is.null(cur)) 0 else nrow(cur)
     paste0("Staged Selection: ", n, " area(s) ready")
   })
-  
+
   observeEvent(input$clear_staged, {
     staged_sf(NULL)
     clear_drawn_features(maplibre_proxy("selector_map"))
   })
-  
+
   observeEvent(input$assign_staged, {
     cur <- staged_sf()
     tid <- input$target_region
     req(!is.null(cur), nrow(cur) > 0, !is.null(tid))
-    
+
     regs <- sync_region_names(regions_store())
     req(!is.null(regs[[tid]]))
-    
+
     existing <- regs[[tid]]$sf
     if (is.null(existing) || nrow(existing) == 0) {
       regs[[tid]]$sf <- cur
@@ -1749,45 +1756,45 @@ server <- function(input, output, session) {
     regions_store(regs)
     staged_sf(NULL)
   })
-  
+
   # ----------------------------------------------------------------------------
   # Fetch LODES RAC + WAC + OD & Aggregate Across All Custom Regions
   # ----------------------------------------------------------------------------
   observeEvent(input$run_comparison, {
     sf::sf_use_s2(FALSE)
-    
+
     regs <- sync_region_names(regions_store())
     regions_store(regs)
-    
+
     empty_regs <- Filter(function(r) is.null(r$sf) || nrow(r$sf) == 0, regs)
-    
+
     if (length(empty_regs) > 0) {
       missing_names <- paste(vapply(empty_regs, function(r) r$name, character(1)), collapse = ", ")
       showNotification(paste0("Please assign at least one area to: ", missing_names), type = "error", duration = 6)
       return()
     }
-    
+
     year_val        <- input$year
     jt_val          <- input$job_type
     seg_val         <- input$segment
     seg_lbl         <- names(segment_choices)[segment_choices == seg_val]
     exclude_overlap <- isTRUE(input$exclude_higher_overlap)
-    
+
     all_states <- unique(unlist(lapply(regs, function(r) r$sf$SRC_STATE)))
-    
+
     withProgress(message = "Building Multi-Region RAC, WAC & OD Profiles...", value = 0, {
       incProgress(0.1, detail = "Dissolving custom region geometries")
-      
+
       dissolved_list <- list()
       base_parts_list <- list()
       cumulative_higher_geom <- NULL
-      
+
       for (idx in seq_along(regs)) {
         r <- regs[[idx]]
         r_label <- if (nzchar(trimws(r$name))) trimws(r$name) else r$id
         base_parts_list[[idx]] <- r$sf |> select(UNIQUE_KEY, geometry)
         r_geom <- dissolve_quietly(r$sf)
-        
+
         if (exclude_overlap && !is.null(cumulative_higher_geom)) {
           r_geom <- difference_quietly(r_geom, cumulative_higher_geom)
           if (length(r_geom) == 0 || all(st_is_empty(r_geom))) {
@@ -1798,13 +1805,13 @@ server <- function(input, output, session) {
             return()
           }
         }
-        
+
         cumulative_higher_geom <- if (is.null(cumulative_higher_geom)) {
           r_geom
         } else {
           union_quietly(cumulative_higher_geom, r_geom)
         }
-        
+
         dissolved_list[[idx]] <- st_sf(
           region_id    = r$id,
           region_name  = r_label,
@@ -1813,20 +1820,20 @@ server <- function(input, output, session) {
           geometry     = r_geom
         )
       }
-      
+
       regions_poly <- do.call(rbind, rev(dissolved_list))
       base_parts_sf <- do.call(rbind, base_parts_list) |> distinct(UNIQUE_KEY, .keep_all = TRUE)
-      
+
       state_wac_list <- list()
       state_rac_list <- list()
       all_block_lookup_list <- list()
       od_raw_list <- list()
-      
+
       for (i in seq_along(all_states)) {
         st <- all_states[i]
         st_lower <- tolower(st)
         incProgress(0.65 / length(all_states), detail = paste("Downloading RAC, WAC & OD for", st))
-        
+
         xwalk_url <- paste0(
           "https://lehd.ces.census.gov/data/lodes/LODES8/",
           st_lower, "/", st_lower, "_xwalk.csv.gz"
@@ -1847,31 +1854,31 @@ server <- function(input, output, session) {
           "https://lehd.ces.census.gov/data/lodes/LODES8/",
           st_lower, "/od/", st_lower, "_od_aux_", jt_val, "_", year_val, ".csv.gz"
         )
-        
+
         xwalk_dest   <- file.path(cache_dir, basename(xwalk_url))
         wac_dest     <- file.path(cache_dir, basename(wac_url))
         rac_dest     <- file.path(cache_dir, basename(rac_url))
         od_main_dest <- file.path(cache_dir, basename(od_main_url))
         od_aux_dest  <- file.path(cache_dir, basename(od_aux_url))
-        
+
         if (!file.exists(xwalk_dest))   download.file(xwalk_url, xwalk_dest, mode = "wb", quiet = TRUE)
         if (!file.exists(wac_dest))     download.file(wac_url, wac_dest, mode = "wb", quiet = TRUE)
         if (!file.exists(rac_dest))     download.file(rac_url, rac_dest, mode = "wb", quiet = TRUE)
         if (!file.exists(od_main_dest)) try(download.file(od_main_url, od_main_dest, mode = "wb", quiet = TRUE), silent = TRUE)
         if (!file.exists(od_aux_dest))  try(download.file(od_aux_url, od_aux_dest, mode = "wb", quiet = TRUE), silent = TRUE)
-        
+
         xwalk_df <- read_csv(
           xwalk_dest,
           col_types = cols_only(tabblk2020 = "c", blklatdd = "d", blklondd = "d")
         ) |> filter(!is.na(blklatdd), !is.na(blklondd))
-        
+
         blk_pts <- st_as_sf(xwalk_df, coords = c("blklondd", "blklatdd"), crs = 4326)
         joined_pts <- suppressMessages(
           st_join(blk_pts, regions_poly, join = st_within, left = FALSE)
         ) |>
           st_drop_geometry() |>
           select(tabblk2020, region_id)
-        
+
         highest_prio_pts <- suppressMessages(
           st_join(blk_pts, regions_poly |> arrange(priority), join = st_within, left = FALSE)
         ) |>
@@ -1879,25 +1886,25 @@ server <- function(input, output, session) {
           distinct(tabblk2020, .keep_all = TRUE) |>
           select(tabblk2020, region_id)
         all_block_lookup_list[[st]] <- highest_prio_pts
-        
+
         if (nrow(joined_pts) > 0) {
           wac_raw <- read_csv(wac_dest, col_types = cols(.default = "d", w_geocode = "c"))
           rac_raw <- read_csv(rac_dest, col_types = cols(.default = "d", h_geocode = "c"))
-          
+
           wac_blk <- summarize_lodes_blocks(wac_raw, "w_geocode") |>
             inner_join(joined_pts, by = "tabblk2020", relationship = "many-to-many") |>
             group_by(region_id) |>
             summarise(across(total_jobs:sex_female, \(x) sum(x, na.rm = TRUE)), .groups = "drop")
-          
+
           rac_blk <- summarize_lodes_blocks(rac_raw, "h_geocode") |>
             inner_join(joined_pts, by = "tabblk2020", relationship = "many-to-many") |>
             group_by(region_id) |>
             summarise(across(total_jobs:sex_female, \(x) sum(x, na.rm = TRUE)), .groups = "drop")
-          
+
           state_wac_list[[st]] <- wac_blk
           state_rac_list[[st]] <- rac_blk
         }
-        
+
         od_cols <- cols_only(
           w_geocode = "c", h_geocode = "c",
           S000 = "d", SA01 = "d", SA02 = "d", SA03 = "d",
@@ -1911,28 +1918,28 @@ server <- function(input, output, session) {
           od_raw_list[[paste0(st, "_aux")]] <- read_csv(od_aux_dest, col_types = od_cols)
         }
       }
-      
+
       incProgress(0.15, detail = "Compiling WAC, RAC & OD commuting matrices")
-      
+
       reg_meta <- tibble(
         region_id    = vapply(regs, function(r) r$id, character(1)),
         region_name  = vapply(regs, function(r) if (nzchar(trimws(r$name))) trimws(r$name) else r$id, character(1)),
         region_color = vapply(regs, function(r) r$color, character(1))
       )
-      
+
       wac_totals <- bind_rows(state_wac_list) |>
         group_by(region_id) |>
         summarise(across(total_jobs:sex_female, \(x) sum(x, na.rm = TRUE)), .groups = "drop")
       wac_totals <- reg_meta |> left_join(wac_totals, by = "region_id") |> mutate(across(total_jobs:sex_female, ~coalesce(., 0)))
-      
+
       rac_totals <- bind_rows(state_rac_list) |>
         group_by(region_id) |>
         summarise(across(total_jobs:sex_female, \(x) sum(x, na.rm = TRUE)), .groups = "drop")
       rac_totals <- reg_meta |> left_join(rac_totals, by = "region_id") |> mutate(across(total_jobs:sex_female, ~coalesce(., 0)))
-      
+
       block_lookup <- bind_rows(all_block_lookup_list) |> distinct(tabblk2020, .keep_all = TRUE)
       id_to_name <- setNames(reg_meta$region_name, reg_meta$region_id)
-      
+
       od_flows <- bind_rows(od_raw_list) |>
         left_join(block_lookup |> rename(h_geocode = tabblk2020, origin_id = region_id), by = "h_geocode") |>
         left_join(block_lookup |> rename(w_geocode = tabblk2020, dest_id   = region_id), by = "w_geocode") |>
@@ -1971,7 +1978,7 @@ server <- function(input, output, session) {
         ) |>
         select(-dest_tot) |>
         ungroup()
-      
+
       comparison_results(list(
         reg_meta        = reg_meta,
         regs_snapshot   = regs,
@@ -1987,48 +1994,48 @@ server <- function(input, output, session) {
         rac_totals      = rac_totals,
         od_flows        = od_flows
       ))
-      
+
       updateTabsetPanel(session, "main_tabs", selected = "report_tab")
     })
   })
-  
+
   # ----------------------------------------------------------------------------
   # Helper: Build Grouped Counts & Shares Table (Omits All-Zero Rows)
   # ----------------------------------------------------------------------------
   build_grouped_table_data <- function(totals_df) {
     n_reg <- nrow(totals_df)
-    
+
     lapply(seq_len(nrow(metric_catalog)), function(idx) {
       v <- metric_catalog$var[idx]
       is_tot <- (v == "total_jobs")
-      
+
       counts <- vapply(seq_len(n_reg), function(i) totals_df[[v]][i], numeric(1))
       if (!is_tot && sum(counts, na.rm = TRUE) == 0) return(NULL)
-      
+
       row_list <- list(
         Category       = metric_catalog$category[idx],
         Characteristic = metric_catalog$label[idx]
       )
-      
+
       for (i in seq_len(n_reg)) {
         rid <- totals_df$region_id[i]
         row_list[[paste0("Cnt_", rid)]] <- counts[i]
       }
-      
+
       for (i in seq_len(n_reg)) {
         rid <- totals_df$region_id[i]
         tot <- totals_df$total_jobs[i]
         shr <- if (tot > 0) counts[i] / tot else 0
         row_list[[paste0("Shr_", rid)]] <- if (is_tot) NA_real_ else shr
       }
-      
+
       as_tibble(row_list)
     }) |> bind_rows()
   }
-  
+
   format_dt_grouped <- function(df, meta) {
     n_reg <- nrow(meta)
-    
+
     sketch <- htmltools::tags$table(
       class = "display",
       htmltools::tags$thead(
@@ -2047,14 +2054,14 @@ server <- function(input, output, session) {
         )
       )
     )
-    
+
     count_cols <- grep("^Cnt_", names(df), value = TRUE)
     share_cols <- grep("^Shr_", names(df), value = TRUE)
-    
+
     cnt_indices     <- seq(2, 1 + n_reg)
     first_share_idx <- 2 + n_reg
     rest_share_idx  <- if (n_reg > 1) seq(first_share_idx + 1, 1 + 2 * n_reg) else integer(0)
-    
+
     col_defs <- list(
       list(className = "dt-right", targets = cnt_indices),
       list(className = "section-divider-left share-col-tint dt-right", targets = first_share_idx)
@@ -2062,7 +2069,7 @@ server <- function(input, output, session) {
     if (length(rest_share_idx) > 0) {
       col_defs[[3]] <- list(className = "share-col-tint dt-right", targets = rest_share_idx)
     }
-    
+
     datatable(
       df,
       container = sketch,
@@ -2078,7 +2085,7 @@ server <- function(input, output, session) {
       formatCurrency(count_cols, currency = "", digits = 0) |>
       formatPercentage(share_cols, digits = 1)
   }
-  
+
   # ----------------------------------------------------------------------------
   # Render Comparison Summary Report (Tab 2)
   # ----------------------------------------------------------------------------
@@ -2091,21 +2098,21 @@ server <- function(input, output, session) {
         p("Use the MapLibre map in Tab 1 to build your custom regions, then click 'Fetch RAC, WAC & OD Data'.")
       ))
     }
-    
+
     meta <- res$reg_meta
     overlap_note <- if (isTRUE(res$exclude_overlap)) {
       " | Overlap Handling: Higher-priority regions excluded from lower regions"
     } else {
       " | Overlap Handling: Full selected boundaries included"
     }
-    
+
     kpi_cards <- lapply(seq_len(nrow(meta)), function(i) {
       rid   <- meta$region_id[i]
       rname <- meta$region_name[i]
       rcol  <- meta$region_color[i]
       w_tot <- res$wac_totals$total_jobs[res$wac_totals$region_id == rid]
       r_tot <- res$rac_totals$total_jobs[res$rac_totals$region_id == rid]
-      
+
       div(
         style = paste0("background: #f8fafc; border-left: 5px solid ", rcol, "; padding: 10px 14px; border-radius: 6px;"),
         div(style = "font-weight: 700; color: #0f172a; font-size: 1.05em; margin-bottom: 4px;", rname),
@@ -2113,7 +2120,7 @@ server <- function(input, output, session) {
         div(style = "font-size: 0.92em; color: #059669;", HTML(paste0("Residence (RAC): <b>", scales::comma(r_tot), "</b>")))
       )
     })
-    
+
     tagList(
       div(
         style = "padding: 16px;",
@@ -2131,39 +2138,39 @@ server <- function(input, output, session) {
             downloadButton("download_r_script", "Download Standalone R Script", class = "btn-outline-dark btn-sm")
           )
         ),
-        
+
         layout_column_wrap(
           width = "240px",
           !!!kpi_cards
         ),
-        
+
         hr(),
-        
+
         h5("Area Characteristics by Work Location (WAC)", style = "color: #0284c7; font-weight: 700;"),
         DTOutput("wac_table"),
-        
+
         hr(),
-        
+
         h5("Area Characteristics by Home Location (RAC)", style = "color: #059669; font-weight: 700;"),
         DTOutput("rac_table")
       )
     )
   })
-  
+
   output$wac_table <- renderDT({
     res <- comparison_results()
     req(res)
     df <- build_grouped_table_data(res$wac_totals)
     format_dt_grouped(df, res$reg_meta)
   })
-  
+
   output$rac_table <- renderDT({
     res <- comparison_results()
     req(res)
     df <- build_grouped_table_data(res$rac_totals)
     format_dt_grouped(df, res$reg_meta)
   })
-  
+
   output$download_report_csv <- downloadHandler(
     filename = function() {
       paste0("lodes_multi_region_rac_wac_", Sys.Date(), ".csv")
@@ -2172,11 +2179,11 @@ server <- function(input, output, session) {
       res <- comparison_results()
       req(res)
       meta <- res$reg_meta
-      
+
       wac_df <- build_grouped_table_data(res$wac_totals) |> mutate(Dataset = "WAC (Work Location)", .before = 1)
       rac_df <- build_grouped_table_data(res$rac_totals) |> mutate(Dataset = "RAC (Home Location)", .before = 1)
       out <- bind_rows(wac_df, rac_df)
-      
+
       col_names <- c(
         "Dataset",
         "Category",
@@ -2184,329 +2191,273 @@ server <- function(input, output, session) {
         paste0("Count (#) - ", meta$region_name),
         paste0("Share (%) - ", meta$region_name)
       )
-      
+
       names(out) <- col_names
       write_csv(out, file)
     }
   )
-  
+
   # ----------------------------------------------------------------------------
-  # Standalone R Script Download Handler
+  # Render Regional Comparison Bar Charts (Tab 3)
   # ----------------------------------------------------------------------------
-  output$download_r_script <- downloadHandler(
-    filename = function() {
-      paste0("run_lodes_regional_comparison_", Sys.Date(), ".R")
-    },
-    content = function(file) {
-      res <- comparison_results()
-      req(res)
-      
-      script_txt <- generate_standalone_r_script(
-        regs            = res$regs_snapshot,
-        year_val        = res$year,
-        jt_val          = res$job_type_code,
-        seg_val         = res$segment_code,
-        exclude_overlap = res$exclude_overlap,
-        pdf_dir         = pdf_base_dir
-      )
-      writeLines(script_txt, file)
+  output$charts_ui <- renderUI({
+    res <- comparison_results()
+    if (is.null(res)) {
+      return(div(
+        style = "padding: 40px; text-align: center; color: #64748b;",
+        h4("No Comparison Data Generated Yet"),
+        p("Build your custom regions in Tab 1 and click 'Fetch RAC, WAC & OD Data' to visualize regional comparisons.")
+      ))
     }
-  )
-  
-  # ----------------------------------------------------------------------------
-  # Executive PDF Report Generator (Map + Workforce Highlights + OD + Sources)
-  # ----------------------------------------------------------------------------
-  output$download_pdf_report <- downloadHandler(
-    filename = function() {
-      paste0("LODES_Regional_Comparison_Report_", Sys.Date(), ".pdf")
-    },
-    content = function(file) {
-      res <- comparison_results()
-      req(res)
-      
-      withProgress(message = "Rendering Printable PDF Report...", value = 0.2, {
-        if (!dir.exists(pdf_base_dir)) {
-          dir.create(pdf_base_dir, recursive = TRUE, showWarnings = FALSE)
-        }
-        work_dir <- file.path(pdf_base_dir, paste0("build_", as.integer(Sys.time())))
-        dir.create(work_dir, recursive = TRUE, showWarnings = FALSE)
-        work_dir <- normalizePath(work_dir, winslash = "/", mustWork = TRUE)
-        
-        on.exit(unlink(work_dir, recursive = TRUE, force = TRUE), add = TRUE)
-        
-        data_rds <- file.path(work_dir, "report_data.rds")
-        saveRDS(res, data_rds)
-        
-        incProgress(0.3, detail = "Generating map & summary tables")
-        
-        is_landscape <- nrow(res$reg_meta) > 5
-        geom_yaml    <- if (is_landscape) 'geometry: "margin=0.5in,landscape"' else "geometry: margin=0.6in"
-        map_chunk_hdr <- if (is_landscape) {
-          "{r map_and_kpis, fig.width=9.5, fig.height=3.0, fig.align='center'}"
-        } else {
-          "{r map_and_kpis, fig.width=8, fig.height=3.5, fig.align='center'}"
-        }
-        
-        bt <- paste0(rep("`", 3), collapse = "")
-        rmd_path <- file.path(work_dir, "comparison_report.Rmd")
-        
-        rmd_lines <- c(
-          "---",
-          'title: "Regional Workforce & Commuting Comparison"',
-          'date: "`r format(Sys.Date(), \'%B %d, %Y\')`"',
-          "output:",
-          "  pdf_document:",
-          "    latex_engine: pdflatex",
-          geom_yaml,
-          "header-includes:",
-          "  - \\usepackage{booktabs}",
-          "  - \\usepackage{longtable}",
-          "  - \\usepackage{array}",
-          "  - \\usepackage{graphicx}",
-          "  - \\usepackage{float}",
-          "  - \\usepackage{xcolor}",
-          "  - \\setlength{\\tabcolsep}{4pt}",
-          "  - \\renewcommand{\\arraystretch}{1.3}",
-          "---",
-          "",
-          paste0(bt, "{r setup, include=FALSE}"),
-          "knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)",
-          "library(dplyr)",
-          "library(tidyr)",
-          "library(sf)",
-          "library(ggplot2)",
-          "library(scales)",
-          "library(knitr)",
-          'res <- readRDS("report_data.rds")',
-          "meta <- res$reg_meta",
-          "is_land <- nrow(meta) > 5",
-          "",
-          "render_wrapped_longtable <- function(df, cat_width = 1.05) {",
-          "  n_reg <- ncol(df) - 1",
-          "  page_w <- if (is_land) 9.8 else 7.15",
-          "  usable_w <- page_w - cat_width - (n_reg + 1) * 0.115",
-          "  reg_w <- round(max(0.95, usable_w / max(1, n_reg)), 2)",
-          "  col_spec <- paste0(",
-          '    ">{\\\\raggedright\\\\arraybackslash}p{", cat_width, "in}",',
-          '    paste(rep(paste0(">{\\\\raggedright\\\\arraybackslash}p{", reg_w, "in}"), n_reg), collapse = "")',
-          "  )",
-          '  tex <- kable(df, format = "latex", booktabs = TRUE, longtable = TRUE)',
-          '  tex <- gsub("LINEBREAKHERE", " \\\\newline ", tex, fixed = TRUE)',
-          "  tex_lines <- strsplit(tex, '\\n', fixed = TRUE)[[1]]",
-          "  lt_idx <- which(startsWith(tex_lines, '\\\\begin{longtable}'))",
-          "  if (length(lt_idx) > 0) {",
-          "    tex_lines[lt_idx[1]] <- paste0('\\\\begin{longtable}[l]{', col_spec, '}')",
-          "  }",
-          "  tex <- paste(tex_lines, collapse = '\\n')",
-          '  cat("\\\\footnotesize\\n", tex, "\\n\\\\normalsize\\n")',
-          "}",
-          bt,
-          "",
-          "**Parameters:** Year `r res$year` | Job Type: `r res$job_type` | Workforce Segment: `r res$segment_label` | Overlap Mode: `r ifelse(res$exclude_overlap, 'Higher-priority regions excluded from lower regions', 'Full selected boundaries included')`",
-          "",
-          "## 1. Custom Regions Map & Headline Totals",
-          "",
-          paste0(bt, map_chunk_hdr),
-          "polys_plot <- res$regions_poly |> arrange(priority)",
-          "polys_plot$region_name <- factor(polys_plot$region_name, levels = meta$region_name)",
-          "pal_map <- setNames(meta$region_color, meta$region_name)",
-          "",
-          "p <- ggplot() +",
-          '  geom_sf(data = res$base_parts_sf, fill = "#f8fafc", color = "#cbd5e1", linewidth = 0.25)',
-          "for (idx in rev(seq_len(nrow(polys_plot)))) {",
-          '  p <- p + geom_sf(data = polys_plot[idx, ], aes(fill = region_name), color = "#0f172a", linewidth = 0.45, alpha = 0.72)',
-          "}",
-          'p + scale_fill_manual(values = pal_map, name = "Custom Regions") +',
-          "  theme_void() +",
-          "  theme(",
-          '    legend.position = "right",',
-          '    legend.title = element_text(face = "bold", size = 10),',
-          "    legend.text = element_text(size = 9),",
-          "    plot.margin = margin(4, 4, 4, 4)",
-          "  )",
-          bt,
-          "",
-          paste0(bt, "{r kpi_table}"),
-          "kpi_df <- tibble(",
-          "  Region = meta$region_name,",
-          "  `Jobs by Work Location` = res$wac_totals$total_jobs,",
-          "  `Workers by Home Location` = res$rac_totals$total_jobs",
-          ") |>",
-          "  mutate(",
-          "    `Jobs-to-Workers Ratio` = ifelse(`Workers by Home Location` > 0, round(`Jobs by Work Location` / `Workers by Home Location`, 2), NA_real_),",
-          "    `Jobs by Work Location` = comma(`Jobs by Work Location`),",
-          "    `Workers by Home Location` = comma(`Workers by Home Location`)",
-          "  )",
-          'kable(kpi_df, booktabs = TRUE, align = c("l", "r", "r", "r"))',
-          bt,
-          "",
-          "## 2. Area Characteristics by Work Location (WAC)",
-          "",
-          "*Demographic and industry breakdown of jobs located inside each region (values sorted descending within each category).*",
-          "",
-          paste0(bt, "{r wac_highlights, results='asis'}"),
-          "wac_hi <- summarize_top_groups(res$wac_totals, meta) |>",
-          "  pivot_wider(names_from = Region, values_from = Highlight)",
-          "render_wrapped_longtable(wac_hi)",
-          bt,
-          "",
-          "*Notes: Categories showing a subset display the largest non-zero groups in descending order: Top 2 groups for Age, Education, and Race; and Top 3 sectors for 2-digit NAICS codes (see Section 5 for sector titles). Active categories are shown for Earnings, Broad Industry, and Sex. Ethnicity displays the Hispanic or Latino share. Monthly earnings tiers follow LEHD LODES definitions: Very Low = $1,250/month or less; Low = $1,251 to $3,333/month; Average = greater than $3,333/month.*",
-          "",
-          "## 3. Area Characteristics by Home Location (RAC)",
-          "",
-          "*Demographic and industry breakdown of employed residents living inside each region (values sorted descending within each category).*",
-          "",
-          paste0(bt, "{r rac_highlights, results='asis'}"),
-          "rac_hi <- summarize_top_groups(res$rac_totals, meta) |>",
-          "  pivot_wider(names_from = Region, values_from = Highlight)",
-          "render_wrapped_longtable(rac_hi)",
-          bt,
-          "",
-          "*Notes: Categories showing a subset display the largest non-zero groups in descending order: Top 2 groups for Age, Education, and Race; and Top 3 sectors for 2-digit NAICS codes (see Section 5 for sector titles). Active categories are shown for Earnings, Broad Industry, and Sex. Ethnicity displays the Hispanic or Latino share. Monthly earnings tiers follow LEHD LODES definitions: Very Low = $1,250/month or less; Low = $1,251 to $3,333/month; Average = greater than $3,333/month.*",
-          "",
-          "## 4. Commuting Flows Between Regions (Origin-Destination)",
-          "",
-          "*Origin (rows) = worker home location; Destination (columns) = worker work location (All Workers S000).*",
-          "",
-          paste0(bt, "{r od_matrix, results='asis'}"),
-          "od <- res$od_flows",
-          'all_ids   <- c(meta$region_id, "OUTSIDE")',
-          'all_names <- c(meta$region_name, "Outside Selected Regions")',
-          "od_mat <- lapply(seq_len(nrow(meta)), function(i) {",
-          "  oid <- meta$region_id[i]",
-          "  sub_od <- od |> filter(origin_id == oid)",
-          "  tot_res <- sum(sub_od$Total_Jobs, na.rm = TRUE)",
-          "  row_vals <- list(`Home Origin` = meta$region_name[i], `Total Resident Workers` = comma(tot_res))",
-          "  for (j in seq_along(all_ids)) {",
-          "    did <- all_ids[j]",
-          "    v <- sub_od$Total_Jobs[sub_od$dest_id == did]",
-          "    v <- if (length(v) == 0) 0 else v[1]",
-          '    pct <- if (tot_res > 0) percent(v / tot_res, accuracy = 0.1) else "0.0%"',
-          '    row_vals[[all_names[j]]] <- paste0(comma(v), " (", pct, ")")',
-          "  }",
-          "  as_tibble(row_vals)",
-          "}) |> bind_rows()",
-          'od_tex <- kable(od_mat, format = "latex", booktabs = TRUE, align = c("l", rep("r", ncol(od_mat) - 1)))',
-          'cat("\\\\begin{table}[H]\\n\\\\centering\\n\\\\resizebox{\\\\textwidth}{!}{\\n", od_tex, "\\n}\\n\\\\end{table}\\n")',
-          bt,
-          "",
-          "### Top Inter-Regional & Internal Commuting Corridors",
-          "",
-          paste0(bt, "{r od_top_pairs, results='asis'}"),
-          "filtered_od <- od |>",
-          '  filter(origin_id != "OUTSIDE" | dest_id != "OUTSIDE") |>',
-          "  arrange(desc(Total_Jobs))",
-          "total_corridors <- nrow(filtered_od)",
-          "top_od <- filtered_od |>",
-          "  slice_head(n = 20) |>",
-          "  transmute(",
-          "    `Home Origin` = Origin,",
-          "    `Work Destination` = Destination,",
-          "    `Commuters` = comma(Total_Jobs),",
-          "    `Origin %` = percent(Share_of_Origin_Workers, accuracy = 0.1),",
-          "    `Dest. %` = percent(Share_of_Dest_Jobs, accuracy = 0.1),",
-          "    `Goods Producing` = comma(Ind_Goods),",
-          "    `Trade & Transp.` = comma(Ind_Trade),",
-          "    `Services` = comma(Ind_Services)",
-          "  )",
-          'cor_tex <- kable(top_od, format = "latex", booktabs = TRUE, align = c("l", "l", "r", "r", "r", "r", "r", "r"))',
-          "cor_lines <- strsplit(cor_tex, '\\n', fixed = TRUE)[[1]]",
-          "tab_idx <- which(startsWith(cor_lines, '\\\\begin{tabular}'))",
-          "if (length(tab_idx) > 0) {",
-          "  cor_lines[tab_idx[1]] <- '\\\\begin{tabular}[t]{>{\\\\raggedright\\\\arraybackslash}p{1.2in}>{\\\\raggedright\\\\arraybackslash}p{1.2in}rrrrrr}'",
-          "}",
-          "cor_tex <- paste(cor_lines, collapse = '\\n')",
-          'cat("\\\\begin{table}[H]\\n\\\\centering\\n\\\\resizebox{\\\\textwidth}{!}{\\n", cor_tex, "\\n}\\n\\\\end{table}\\n")',
-          "if (total_corridors > 20) {",
-          '  cat(sprintf("\\n*Note: Showing the top 20 commuting corridors out of %s total available origin-destination pairs.*\\n", comma(total_corridors)))',
-          "}",
-          bt,
-          "",
-          "## 5. Data Sources & Definitions",
-          "",
-          "All workforce and commuting statistics are derived from the **U.S. Census Bureau Longitudinal Employer-Household Dynamics (LEHD) Origin-Destination Employment Statistics (LODES, Version 8)** program:",
-          "",
-          "- **Work Location Characteristics (WAC — Workplace Area Characteristics):** Summarizes employment by the Census block where workers are employed, including worker age, monthly earnings, educational attainment, race, ethnicity, sex, and 2-digit NAICS industry sector.",
-          "- **Home Location Characteristics (RAC — Residence Area Characteristics):** Summarizes employed workers by the Census block where they reside across the same demographic and industry dimensions.",
-          "- **Commuting Flows (OD — Origin-Destination):** Links workers' home Census blocks (origin) to their employment Census blocks (destination) for both within-state (`od_main`) and cross-state (`od_aux`) commuters, disaggregated by worker age, monthly earnings tier, and broad industry sector (Goods Producing, Trade/Transportation/Utilities, and All Other Services).",
-          "- **Program & Data Links:**",
-          "  - LEHD Program Overview: https://lehd.ces.census.gov/",
-          "  - LODES Data Repository & Technical Documentation: https://lehd.ces.census.gov/data/",
-          "",
-          "### 2-Digit NAICS Industry Sector Reference",
-          "",
-          paste0(bt, "{r naics_ref_table, results='asis'}"),
-          "naics_df <- metric_catalog |>",
-          '  filter(category == "2-Digit NAICS") |>',
-          "  mutate(",
-          '    Code = sub(":.*$", "", label),',
-          '    Sector = sub("^[^:]+:\\\\s*", "", label),',
-          "    Broad = case_when(",
-          '      var %in% c("cns01", "cns02", "cns03", "cns04", "cns05") ~ "Goods Producing",',
-          '      var %in% c("cns06", "cns07", "cns08") ~ "Trade & Transp.",',
-          '      TRUE ~ "Services"',
-          "    )",
-          "  ) |>",
-          "  select(Code, Sector, Broad)",
-          "naics_wide <- bind_cols(naics_df[1:10, ], naics_df[11:20, ])",
-          'names(naics_wide) <- c("NAICS Code", "Industry Sector", "Broad Sector", "NAICS Code ", "Industry Sector ", "Broad Sector ")',
-          'n_tex <- kable(naics_wide, format = "latex", booktabs = TRUE, align = c("l", "l", "l", "l", "l", "l"))',
-          'cat("\\\\begin{table}[H]\\n\\\\centering\\n\\\\resizebox{\\\\textwidth}{!}{\\n", n_tex, "\\n}\\n\\\\end{table}\\n")',
-          bt
+
+    meta <- res$reg_meta
+    reg_choices <- setNames(as.character(meta$region_id), as.character(meta$region_name))
+    cat_choices <- unique(as.character(metric_catalog$category))
+
+    tagList(
+      div(
+        style = "padding: 16px;",
+        div(
+          style = "display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;",
+          div(
+            h4("Regional Comparison Bar Charts", style = "margin: 0; color: #1e3a8a; font-weight: 700;"),
+            p(style = "margin: 2px 0 0 0; color: #475569; font-size: 0.9em;",
+              paste0("Year: ", res$year, " | Job Type: ", res$job_type, " | Segment: ", res$segment_label))
+          ),
+          downloadButton("download_chart_png", "Download Chart (PNG)", class = "btn-outline-primary btn-sm")
+        ),
+
+        # Controls bar above the chart body
+        div(
+          class = "chart-controls-bar",
+          style = "background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px;",
+          layout_columns(
+            col_widths = c(2, 2, 3, 2, 3),
+            selectInput(
+              "chart_dataset",
+              "Dataset:",
+              choices = c("WAC (Work Location)" = "wac", "RAC (Home Location)" = "rac"),
+              selected = "wac"
+            ),
+            selectInput(
+              "chart_category",
+              "Category:",
+              choices = cat_choices,
+              selected = "Broad Industry"
+            ),
+            selectInput(
+              "chart_characteristic",
+              "Characteristic:",
+              choices = c("All in Category (Faceted)" = "ALL"),
+              selected = "ALL"
+            ),
+            selectInput(
+              "chart_metric_type",
+              "Plot Values:",
+              choices = c("Counts (#)" = "count", "Share of Total (%)" = "share"),
+              selected = "count"
+            ),
+            selectizeInput(
+              "chart_exclude_regions",
+              "Exclude Regions:",
+              choices = reg_choices,
+              selected = character(0),
+              multiple = TRUE,
+              options = list(placeholder = "None excluded")
+            )
+          )
+        ),
+
+        div(
+          style = "background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;",
+          uiOutput("comparison_plot_container")
         )
-        writeLines(rmd_lines, rmd_path)
-        
-        incProgress(0.4, detail = "Compiling PDF via LaTeX")
-        
-        render_env <- new.env(parent = globalenv())
-        render_env$summarize_top_groups <- summarize_top_groups
-        render_env$clean_pdf_label <- clean_pdf_label
-        render_env$metric_catalog <- metric_catalog
-        
-        tryCatch({
-          rendered_pdf <- rmarkdown::render(
-            input = rmd_path,
-            output_format = "pdf_document",
-            output_file = "comparison_report.pdf",
-            output_dir = work_dir,
-            intermediates_dir = work_dir,
-            knit_root_dir = work_dir,
-            envir = render_env,
-            quiet = TRUE
-          )
-          file.copy(rendered_pdf, file, overwrite = TRUE)
-        }, error = function(e) {
-          log_file <- file.path(work_dir, "comparison_report.log")
-          log_hint <- ""
-          if (file.exists(log_file)) {
-            log_lines <- readLines(log_file, warn = FALSE)
-            err_idx <- grep("^!|Error|not found|Permission", log_lines)
-            if (length(err_idx) > 0) {
-              keep_idx <- unique(pmin(length(log_lines), c(err_idx, err_idx + 1)))
-              log_hint <- paste(" | Log:", paste(head(log_lines[keep_idx], 4), collapse = " ; "))
-            }
-          }
-          message("PDF Render Error: ", e$message, log_hint)
-          showNotification(
-            paste0("PDF compilation failed: ", e$message, log_hint),
-            type = "error",
-            duration = 15
-          )
-        })
-      })
+      )
+    )
+  })
+
+  # Update single-characteristic dropdown whenever category or dataset changes
+  observeEvent(list(input$chart_category, input$chart_dataset, comparison_results()), {
+    res <- comparison_results()
+    req(res, input$chart_category)
+
+    ds <- if (!is.null(input$chart_dataset) && identical(as.character(input$chart_dataset), "rac")) {
+      res$rac_totals
+    } else {
+      res$wac_totals
+    }
+    sub_cat <- metric_catalog |> filter(category == as.character(input$chart_category))
+
+    active_vars <- vapply(sub_cat$var, function(v) {
+      v == "total_jobs" || sum(as.numeric(ds[[v]]), na.rm = TRUE) > 0
+    }, logical(1))
+    sub_cat <- sub_cat[active_vars, ]
+
+    char_choices <- c(
+      "All in Category (Faceted)" = "ALL",
+      setNames(as.character(sub_cat$var), as.character(sub_cat$label))
+    )
+    cur_val <- isolate(input$chart_characteristic)
+    if (is.null(cur_val) || !as.character(cur_val) %in% unname(char_choices)) {
+      cur_val <- "ALL"
+    }
+    updateSelectInput(session, "chart_characteristic", choices = char_choices, selected = cur_val)
+  })
+
+  # Reactive ggplot builder shared by screen display and PNG download
+  build_comparison_ggplot <- reactive({
+    res <- comparison_results()
+    req(res, input$chart_dataset, input$chart_category, input$chart_characteristic, input$chart_metric_type)
+
+    ds_choice   <- as.character(input$chart_dataset)[1]
+    cat_choice  <- as.character(input$chart_category)[1]
+    char_choice <- as.character(input$chart_characteristic)[1]
+    type_choice <- as.character(input$chart_metric_type)[1]
+
+    meta <- res$reg_meta
+    excl <- input$chart_exclude_regions
+    if (!is.null(excl) && length(excl) > 0) {
+      meta <- meta |> filter(!region_id %in% as.character(excl))
+    }
+    shiny::validate(shiny::need(nrow(meta) > 0, "All regions are excluded. Remove at least one region from 'Exclude Regions' to display the chart."))
+
+    totals_df <- if (identical(ds_choice, "rac")) res$rac_totals else res$wac_totals
+    totals_df <- totals_df |> filter(region_id %in% meta$region_id)
+
+    sub_cat <- metric_catalog |> filter(category == cat_choice)
+    if (!identical(char_choice, "ALL") && char_choice %in% sub_cat$var) {
+      sub_cat <- sub_cat |> filter(var == char_choice)
+    }
+
+    keep_mask <- vapply(sub_cat$var, function(v) {
+      v == "total_jobs" || sum(as.numeric(totals_df[[v]]), na.rm = TRUE) > 0
+    }, logical(1))
+    sub_cat <- sub_cat[keep_mask, ]
+    shiny::validate(shiny::need(nrow(sub_cat) > 0, "No non-zero observations available for the selected category and regions."))
+
+    tot_vec <- as.numeric(totals_df$total_jobs)
+    plot_rows <- lapply(seq_len(nrow(sub_cat)), function(idx) {
+      v   <- as.character(sub_cat$var[idx])
+      lbl <- as.character(sub_cat$label[idx])
+      cnt <- as.numeric(totals_df[[v]])
+      tibble(
+        region_id      = as.character(totals_df$region_id),
+        Characteristic = lbl,
+        Count          = cnt,
+        Share          = ifelse(tot_vec > 0, cnt / tot_vec, 0)
+      )
+    }) |> bind_rows()
+
+    reg_levels  <- as.character(meta$region_name)
+    char_levels <- unique(as.character(sub_cat$label))
+
+    plot_df <- plot_rows |>
+      left_join(meta |> select(region_id, region_name, region_color), by = "region_id") |>
+      mutate(
+        region_name    = factor(as.character(region_name), levels = reg_levels),
+        Characteristic = factor(as.character(Characteristic), levels = char_levels),
+        PlotVal        = if (identical(type_choice, "share")) as.numeric(Share) else as.numeric(Count),
+        LabelText      = if (identical(type_choice, "share")) {
+          as.character(scales::label_percent(accuracy = 0.1)(Share))
+        } else {
+          as.character(scales::label_comma(accuracy = 1)(Count))
+        }
+      )
+
+    pal_vec <- setNames(as.character(meta$region_color), as.character(meta$region_name))
+    ds_title <- if (identical(ds_choice, "rac")) {
+      "Area Characteristics by Home Location (RAC)"
+    } else {
+      "Area Characteristics by Work Location (WAC)"
+    }
+    metric_title <- if (identical(type_choice, "share")) "Share of Total (%)" else "Counts (#)"
+    chart_title <- if (identical(char_choice, "ALL")) cat_choice else as.character(sub_cat$label[1])
+    sub_title <- if (identical(char_choice, "ALL")) {
+      paste0(ds_title, " | Category: ", cat_choice, " | ", metric_title, " (", res$year, ", ", res$job_type, ", ", res$segment_label, ")")
+    } else {
+      paste0(ds_title, " | ", as.character(sub_cat$label[1]), " | ", metric_title, " (", res$year, ", ", res$job_type, ", ", res$segment_label, ")")
+    }
+
+    is_faceted <- (identical(char_choice, "ALL") && nrow(sub_cat) > 1)
+    n_facets   <- length(char_levels)
+    n_cols     <- if (n_facets <= 2) n_facets else if (n_facets <= 9) 3 else 4
+
+    y_scale <- if (identical(type_choice, "share")) {
+      scale_y_continuous(labels = scales::label_percent(accuracy = 1), expand = expansion(mult = c(0, 0.16)))
+    } else {
+      scale_y_continuous(labels = scales::label_comma(accuracy = 1), expand = expansion(mult = c(0, 0.16)))
+    }
+
+    p <- ggplot(plot_df, aes(x = region_name, y = PlotVal, fill = region_name)) +
+      geom_col(width = 0.68, show.legend = FALSE) +
+      geom_text(
+        aes(label = LabelText),
+        vjust = -0.35,
+        size = 3.4,
+        fontface = "bold",
+        color = "#1e293b"
+      ) +
+      scale_fill_manual(values = pal_vec) +
+      y_scale +
+      labs(
+        title    = as.character(chart_title),
+        subtitle = as.character(sub_title),
+        x        = NULL,
+        y        = as.character(metric_title)
+      ) +
+      theme_minimal(base_size = 12) +
+      theme(
+        plot.title         = element_text(face = "bold", color = "#1e3a8a", size = 14),
+        plot.subtitle      = element_text(color = "#475569", size = 10, margin = margin(b = 10)),
+        axis.text.x        = element_text(angle = if (nrow(meta) > 3) 25 else 0, hjust = if (nrow(meta) > 3) 1 else 0.5, face = "bold", color = "#0f172a"),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor   = element_blank(),
+        strip.background   = element_rect(fill = "#f1f5f9", color = "#cbd5e1"),
+        strip.text         = element_text(face = "bold", color = "#0f172a", size = 10)
+      )
+
+    if (is_faceted) {
+      p <- p + facet_wrap(~Characteristic, ncol = n_cols, scales = "free_y")
+    }
+
+    list(plot = p, n_facets = n_facets, n_cols = n_cols, is_faceted = is_faceted)
+  })
+
+  output$comparison_plot_container <- renderUI({
+    built <- build_comparison_ggplot()
+    n_rows <- if (built$is_faceted) ceiling(built$n_facets / built$n_cols) else 1
+    plot_h <- max(440, n_rows * 270)
+    plotOutput("comparison_bar_plot", height = paste0(plot_h, "px"), width = "100%")
+  })
+
+  output$comparison_bar_plot <- renderPlot({
+    built <- build_comparison_ggplot()
+    print(built$plot)
+  })
+
+  output$download_chart_png <- downloadHandler(
+    filename = function() {
+      cat_slug <- gsub("[^A-Za-z0-9]+", "_", tolower(input$chart_category))
+      paste0("lodes_comparison_chart_", input$chart_dataset, "_", cat_slug, "_", Sys.Date(), ".png")
+    },
+    content = function(file) {
+      built <- build_comparison_ggplot()
+      n_rows <- if (built$is_faceted) ceiling(built$n_facets / built$n_cols) else 1
+      h_in <- max(5.5, n_rows * 3.1)
+      ggsave(file, plot = built$plot, width = 12, height = h_in, dpi = 300, bg = "white")
     }
   )
-  
+
   # ----------------------------------------------------------------------------
-  # Render Dissolved Regional Profile Map (Tab 3)
+  # Render Dissolved Regional Profile Map (Tab 4)
   # ----------------------------------------------------------------------------
   output$profile_map <- renderMaplibre({
     res <- comparison_results()
     req(res)
-    
+
     polys <- res$regions_poly
     meta  <- res$reg_meta
-    
+
     popups <- vapply(polys$region_id, function(rid) {
       rname <- meta$region_name[meta$region_id == rid]
       build_region_popup(
@@ -2516,11 +2467,11 @@ server <- function(input, output, session) {
         res$segment_label
       )
     }, character(1))
-    
+
     polys$popup_html <- popups
-    
+
     m <- maplibre(style = carto_style("positron"), bounds = as.numeric(st_bbox(polys)))
-    
+
     for (i in seq_len(nrow(polys))) {
       sub_poly <- polys[i, ]
       rid <- sub_poly$region_id
@@ -2541,7 +2492,7 @@ server <- function(input, output, session) {
           line_width = 2
         )
     }
-    
+
     m |>
       add_legend(
         legend_title = "Custom Regions (Click for RAC/WAC Profile)",
@@ -2554,9 +2505,9 @@ server <- function(input, output, session) {
       add_fullscreen_control(position = "top-right") |>
       add_scale_control(position = "bottom-left")
   })
-  
+
   # ----------------------------------------------------------------------------
-  # Render Origin-Destination (OD) Commuting Flows (Tab 4)
+  # Render Origin-Destination (OD) Commuting Flows (Tab 5)
   # ----------------------------------------------------------------------------
   output$od_ui <- renderUI({
     res <- comparison_results()
@@ -2567,7 +2518,7 @@ server <- function(input, output, session) {
         p("Build your custom regions in Tab 1 and click 'Fetch RAC, WAC & OD Data' to analyze origin-destination worker flows.")
       ))
     }
-    
+
     tagList(
       div(
         style = "padding: 16px;",
@@ -2581,38 +2532,38 @@ server <- function(input, output, session) {
           ),
           downloadButton("download_od_csv", "Download OD Flows CSV", class = "btn-outline-primary btn-sm")
         ),
-        
+
         h5("Commuting Origin-Destination Matrix (Residence → Workplace)", style = "color: #0284c7; font-weight: 700;"),
         p(class = "text-muted", style = "font-size: 0.85em;",
           "Rows represent where workers live (Origin); columns represent where they work (Destination)."),
         DTOutput("od_matrix_table"),
-        
+
         hr(),
-        
+
         h5("Detailed Pairwise Commuting Flows by Worker & Industry Group", style = "color: #059669; font-weight: 700;"),
         DTOutput("od_detail_table")
       )
     )
   })
-  
+
   output$od_matrix_table <- renderDT({
     res <- comparison_results()
     req(res)
     meta <- res$reg_meta
     od   <- res$od_flows
-    
+
     all_ids   <- c(meta$region_id, "OUTSIDE")
     all_names <- c(meta$region_name, "Outside Selected Regions")
     n_dest    <- length(all_ids)
-    
+
     matrix_rows <- lapply(seq_len(nrow(meta)), function(i) {
       oid   <- meta$region_id[i]
       oname <- meta$region_name[i]
       sub_od <- od |> filter(origin_id == oid)
       tot_res <- sum(sub_od$Total_Jobs, na.rm = TRUE)
-      
+
       row_list <- list(Origin = oname, Total_Resident_Workers = tot_res)
-      
+
       for (j in seq_along(all_ids)) {
         did <- all_ids[j]
         val <- sub_od$Total_Jobs[sub_od$dest_id == did]
@@ -2624,10 +2575,10 @@ server <- function(input, output, session) {
         val <- row_list[[paste0("Cnt_", did)]]
         row_list[[paste0("Shr_", did)]] <- if (tot_res > 0) val / tot_res else 0
       }
-      
+
       as_tibble(row_list)
     }) |> bind_rows()
-    
+
     sketch <- htmltools::tags$table(
       class = "display",
       htmltools::tags$thead(
@@ -2649,15 +2600,15 @@ server <- function(input, output, session) {
         )
       )
     )
-    
+
     cnt_cols <- c("Total_Resident_Workers", grep("^Cnt_", names(matrix_rows), value = TRUE))
     shr_cols <- grep("^Shr_", names(matrix_rows), value = TRUE)
-    
+
     first_cnt_idx   <- 2
     rest_cnt_idx    <- if (n_dest > 1) seq(first_cnt_idx + 1, 1 + n_dest) else integer(0)
     first_share_idx <- 2 + n_dest
     rest_share_idx  <- if (n_dest > 1) seq(first_share_idx + 1, 1 + 2 * n_dest) else integer(0)
-    
+
     col_defs <- list(
       list(className = "dt-right", targets = 1),
       list(className = "section-divider-left dt-right", targets = first_cnt_idx),
@@ -2669,7 +2620,7 @@ server <- function(input, output, session) {
     if (length(rest_share_idx) > 0) {
       col_defs[[length(col_defs) + 1]] <- list(className = "share-col-tint dt-right", targets = rest_share_idx)
     }
-    
+
     datatable(
       matrix_rows,
       container = sketch,
@@ -2685,11 +2636,11 @@ server <- function(input, output, session) {
       formatCurrency(cnt_cols, currency = "", digits = 0) |>
       formatPercentage(shr_cols, digits = 1)
   })
-  
+
   output$od_detail_table <- renderDT({
     res <- comparison_results()
     req(res)
-    
+
     df <- res$od_flows |>
       select(
         Origin, Destination, Total_Jobs,
@@ -2699,7 +2650,7 @@ server <- function(input, output, session) {
         Ind_Goods, Ind_Trade, Ind_Services
       ) |>
       arrange(desc(Total_Jobs))
-    
+
     col_names <- c(
       "Origin (Residence)", "Destination (Workplace)", "Total Commuters",
       "Share of Origin (%)", "Share of Dest. (%)",
@@ -2707,13 +2658,13 @@ server <- function(input, output, session) {
       "Earn <= $1,250", "Earn $1,250-$3,333", "Earn > $3,333",
       "Goods Producing", "Trade & Transp.", "Services"
     )
-    
+
     num_cols <- c(
       "Total_Jobs", "Age_Under_30", "Age_30_to_54", "Age_55_Plus",
       "Earn_Low", "Earn_Mid", "Earn_High",
       "Ind_Goods", "Ind_Trade", "Ind_Services"
     )
-    
+
     datatable(
       df,
       colnames = col_names,
@@ -2731,7 +2682,7 @@ server <- function(input, output, session) {
       formatCurrency(num_cols, currency = "", digits = 0) |>
       formatPercentage(c("Share_of_Origin_Workers", "Share_of_Dest_Jobs"), digits = 1)
   })
-  
+
   output$download_od_csv <- downloadHandler(
     filename = function() {
       paste0("lodes_od_commuting_flows_", Sys.Date(), ".csv")
