@@ -1,7 +1,7 @@
 Package: DETRLMI
 Type: Package
 Title: Useful tools by DETR LMI
-Version: 0.7
+Version: 0.8
 Authors@R: c(
     person("David", "Schmidt", email = "deschmidt@detr.nv.gov", role = c("aut", "cre")),
     person("Antonio", "Solorio", email = "aisolorio@detr.nv.gov", role = "aut"))
@@ -13,20 +13,27 @@ Depends:
 Imports:
     alfred (>= 0.2.1),
     BLSloadR,
+    bslib,
     cli,
     data.table (>= 1.16),
     dplyr (>= 1.1),
+    DT,
     ggplot2 (>= 3.5),
     htmlwidgets,
+    htmltools,
     httr (>= 1.4.7),
     httr2 (>= 1.0.0),
     jsonlite (>= 1.8.8),
+    knitr,
     lubridate (>= 1.9),
     mapgl,
     purrr,
     rappdirs,
+    readr,
     rlang,
+    rmarkdown,
     RODBC,
+    scales,
     sf,
     shiny,
     stats,

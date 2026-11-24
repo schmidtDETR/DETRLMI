@@ -54,3 +54,28 @@ explore_rac <- function(regional = FALSE) {
   # Launch the app
   shiny::runApp(app_dir, display.mode = "normal")
 }
+
+#' Launch the Census LODES Region Comparison App
+#'
+#' This function launches an interactive Shiny application to explore,
+#' filter, and download Census ACS variables.
+#'
+#' @import shiny
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' DETRLMI::lodes_comparison()
+#' }
+lodes_comparison <- function() {
+  # Locate the app inside the installed package
+  app_dir <- system.file("shiny", "lodes_region_comparison", package = "DETRLMI")
+
+  # Error handling just in case the folder goes missing
+  if (app_dir == "") {
+    stop("Could not find the 'lodes_region_comparison' app directory. Try re-installing the `DETRLMI` package.", call. = FALSE)
+  }
+
+  # Launch the app
+  shiny::runApp(app_dir, display.mode = "normal")
+}
